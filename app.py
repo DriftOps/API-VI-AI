@@ -12,5 +12,4 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Incluir rotas
 app.include_router(router)

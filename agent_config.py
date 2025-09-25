@@ -21,7 +21,7 @@ gemini_model = genai.GenerativeModel("gemini-1.5-flash")
 
 #agente adk
 root_agent = Agent(
-    model="gemini-1.5-flash",
+    model="gemini-2.5-flash",
     name="NutriX",
     instruction="""
         Você é um assistente especializado em nutrição.

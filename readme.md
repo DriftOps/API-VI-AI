@@ -1,11 +1,3 @@
----
-
-````markdown
-
-Como rodar o projeto:
-
----
-
 ## ⚡ Pré-requisitos
 
 - Python 3.11+  

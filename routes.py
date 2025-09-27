@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from rag_agent import responder_rag  # função que integra ADK + RAG
+from rag.rag_agent import responder_rag
 
 router = APIRouter()
 chat_history = []

@@ -1,29 +1,30 @@
-# rag_agent.py
-from agent_config import root_agent
-from rag_loader import load_csv_to_chroma
-from rag_retriever import create_retriever
+from agent_config import gemini_model 
+from rag.rag_loader import load_csv_to_chroma
+from rag.rag_retriever import retrieve_documents 
 
-# Carregar CSVs
+# Carregar CSVs e criar collection
 csv_files = ["data/taco-db-nutrientes.csv", "data/taco-db-nutrientes-2.csv"]
-collection = load_csv_to_chroma(csv_files)
-retriever = create_retriever(collection)
+# Garanta que os arquivos CSV estejam no caminho correto
+collection = load_csv_to_chroma(csv_files) 
 
 def responder_rag(pergunta: str):
-    # Recupera documentos mais relevantes
-    docs = retriever.get_relevant_documents(pergunta)
-    contexto = "\n".join([doc.page_content for doc in docs])
+    # Busca os documentos relevantes no ChromaDB
+    docs = retrieve_documents(collection, pergunta)
+    contexto = "\n".join(docs)
 
     # Cria prompt enriquecido
     prompt = f"""
-Você é um assistente especializado em nutrição. Use as informações abaixo para responder de forma clara e prática:
+Use as informações do contexto abaixo para responder à pergunta do usuário.
 
 Contexto adicional dos documentos:
+---
 {contexto}
+---
 
 Pergunta do usuário:
 {pergunta}
 """
 
-    # Rodar no ADK
-    response = root_agent.run(prompt)
+    # GERA A RESPOSTA DIRETAMENTE COM O MODELO
+    response = gemini_model.generate_content(prompt)
     return response.text

@@ -1,11 +1,12 @@
-# rag_retriever.py
-from langchain.vectorstores import Chroma
-
-def create_retriever(collection):
-    # Usa o mesmo client do Chroma
-    vectorstore = Chroma(collection_name=collection.name, client=collection._client)
-    retriever = vectorstore.as_retriever(
-        search_type="similarity",
-        search_kwargs={"k": 3}  # retorna 3 documentos mais relevantes
+def retrieve_documents(collection, pergunta: str):
+    # Faz a busca de similaridade diretamente
+    results = collection.query(
+        query_texts=[pergunta],
+        n_results=3  # k=3 documentos mais relevantes
     )
-    return retriever
+    
+    # Extrai o conteúdo dos documentos
+    documents = results.get("documents", [[]])[0]
+    
+    # Retorna uma lista simples de strings de documentos
+    return documents

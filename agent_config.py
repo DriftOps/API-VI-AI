@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 import google.generativeai as genai
-from google.adk.agents import Agent
 
 # Carregar variáveis do .env
 load_dotenv()
@@ -14,16 +13,11 @@ if not GEMINI_API_KEY:
 # Configurar Gemini
 genai.configure(api_key=GEMINI_API_KEY)
 
-
-#modelo
-gemini_model = genai.GenerativeModel("gemini-1.5-flash")
-
-
-#agente adk
-root_agent = Agent(
-    model="gemini-2.5-flash",
-    name="NutriX",
-    instruction="""
+# Modelo principal para geração de texto
+# OBS: O modelo "gemini-2.5-flash" ainda não existe, usei o 1.5-flash
+gemini_model = genai.GenerativeModel(
+    model_name="models/gemini-2.5-flash",
+    system_instruction="""
         Você é um assistente especializado em nutrição.
         Responda de forma clara, prática e amigável.
         Base inicial:

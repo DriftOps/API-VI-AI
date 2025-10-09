@@ -49,7 +49,7 @@ def load_documents_to_chroma(doc_files, collection_name="nutrientes_collection")
                 ext = os.path.splitext(file)[1].lower()
                 if ext == ".pdf":
                     text = read_pdf(file)
-                elif ext in [".xlsx", ".xls"]:
+                elif ext in [".xlsx"]:
                     text = read_xlsx(file)
                 else:
                     print(f"Ignorando arquivo {file} (tipo não suportado)")

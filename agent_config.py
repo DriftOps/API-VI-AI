@@ -14,7 +14,6 @@ if not GEMINI_API_KEY:
 genai.configure(api_key=GEMINI_API_KEY)
 
 # Modelo principal para geração de texto
-# OBS: O modelo "gemini-2.5-flash" ainda não existe, usei o 1.5-flash
 gemini_model = genai.GenerativeModel(
     model_name="models/gemini-2.5-flash",
     system_instruction="""

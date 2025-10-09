@@ -1,7 +1,9 @@
 import os
 import pandas as pd
 import chromadb
+from PyPDF2 import PdfReader
 from chromadb.utils.embedding_functions import GoogleGenerativeAiEmbeddingFunction
+from langchain.text_splitter import CharacterTextSplitter
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,9 +11,28 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 CHROMA_PATH = "chroma_db"
 
-def load_csv_to_chroma(csv_files, collection_name="nutrientes_collection"):
-    client = chromadb.PersistentClient(path="chroma_db")
-    embedding_fn = GoogleGenerativeAiEmbeddingFunction(api_key=GEMINI_API_KEY, model_name="models/text-embedding-004")
+def read_pdf(file_path):
+    pdf = PdfReader(file_path)
+    text = ""
+    for page in pdf.pages:
+        page_text = page.extract_text()
+        if page_text:
+            text += page_text + "\n"
+    return text
+
+def read_xlsx(file_path):
+    df = pd.read_excel(file_path)
+    text = ""
+    for _, row in df.iterrows():
+        text += " | ".join([str(v) for v in row.values]) + "\n"
+    return text
+
+def load_documents_to_chroma(doc_files, collection_name="nutrientes_collection"):
+    client = chromadb.PersistentClient(path=CHROMA_PATH)
+    embedding_fn = GoogleGenerativeAiEmbeddingFunction(
+        api_key=GEMINI_API_KEY, 
+        model_name="models/text-embedding-004"
+    )
 
     collection = client.get_or_create_collection(
         name=collection_name,
@@ -19,30 +40,36 @@ def load_csv_to_chroma(csv_files, collection_name="nutrientes_collection"):
     )
 
     if collection.count() == 0:
-        print("Collection is empty. Loading data from CSVs...")
-        for file in csv_files:
-            try:
-                df = pd.read_csv(file, on_bad_lines='skip')
+        print("Collection vazia. Carregando documentos...")
 
-                # Corrigido com os nomes de coluna corretos do seu log
-                ids = [str(item) for item in df["id"].tolist()]
-                documents = df["Nome"].tolist() # <-- CORREÇÃO APLICADA AQUI
+        text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+
+        for file in doc_files:
+            try:
+                ext = os.path.splitext(file)[1].lower()
+                if ext == ".pdf":
+                    text = read_pdf(file)
+                elif ext in [".xlsx", ".xls"]:
+                    text = read_xlsx(file)
+                else:
+                    print(f"Ignorando arquivo {file} (tipo não suportado)")
+                    continue
+
+                chunks = text_splitter.split_text(text)
+                ids = [f"{os.path.basename(file)}_{i}" for i in range(len(chunks))]
 
                 collection.add(
                     ids=ids,
-                    documents=documents,
-                    metadatas=[{"source": file}] * len(ids)
+                    documents=chunks,
+                    metadatas=[{"source": file}] * len(chunks)
                 )
 
-            except KeyError as e:
-                print(f"ERRO: A coluna {e} não foi encontrada no arquivo {file}. Verifique os nomes das colunas e corrija o código.")
-                return None
             except Exception as e:
-                print(f"Ocorreu um erro inesperado ao processar {file}: {e}")
-                return None
+                print(f"Erro ao processar {file}: {e}")
+                continue
 
-        print("Dados carregados com sucesso!")
+        print("Documentos carregados com sucesso!")
     else:
-        print("Collection already exists and contains data.")
+        print("Collection já existe com dados.")
 
     return collection

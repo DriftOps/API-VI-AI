@@ -14,7 +14,7 @@ def responder_rag(pergunta: str):
     contexto = "\n".join(docs)
 
     prompt = f"""
-Use as informações do contexto abaixo para responder à pergunta do usuário.
+Use as informações do usuário e do contexto abaixo para responder à pergunta do usuário.
 
 Contexto adicional dos documentos:
 ---

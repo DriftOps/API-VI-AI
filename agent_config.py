@@ -3,13 +3,19 @@ import os, sqlite3, json, time
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
-import google.generativeai as genai  # seu setup do Gemini
+import google.generativeai as genai
 
+# Carrega variáveis do .env
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise RuntimeError("Defina GEMINI_API_KEY no .env")
-genai.configure(api_key=GEMINI_API_KEY)
+
+# Chave da API do Gemini
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# Cria o modelo e exporta
+gemini_model = genai.GenerativeModel("gemini-1.5-flash")
 
 DB = "nutrix.db"
 app = FastAPI()

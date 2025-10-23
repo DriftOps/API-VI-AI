@@ -17,6 +17,7 @@ class Pergunta(BaseModel):
 def root():
     return {"message": "Agente NutriX com Gemini/ADK + RAG está funcionando!"}
 
+@router.post("/chat")
 @router.post("/responder")
 async def responder(pergunta: Pergunta, authorization: str = Header(None)):
     global chat_history

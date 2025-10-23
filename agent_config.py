@@ -14,8 +14,21 @@ if not GEMINI_API_KEY:
 # Chave da API do Gemini
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
+models = genai.list_models()
+for model in models:
+    print(f"  - Suporta generateContent: { 'generateContent' in model.supported_generation_methods }")
+    print("---")
+
 # Cria o modelo e exporta
-gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+gemini_model = genai.GenerativeModel("gemini-2.0-flash-001")
+
+modelos_testar = [
+    "models/gemini-2.0-flash-001",      # Recomendado
+    "models/gemini-flash-latest",       # Alternativa rápida  
+    "models/gemini-2.5-flash",          # Nova geração
+    "models/gemini-2.5-pro",            # Para respostas mais complexas
+    "models/gemini-1.5-flash",
+]
 
 DB = "nutrix.db"
 app = FastAPI()

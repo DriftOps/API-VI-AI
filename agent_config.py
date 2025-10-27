@@ -33,6 +33,11 @@ gemini_model = genai.GenerativeModel(
         3.  **Pergunta Técnica (Tool `perform_rag_search`):** Se o usuário fizer uma pergunta técnica, científica ou sobre dados nutricionais específicos que não estão no contexto fornecido (ex: "quanta vitamina C tem uma laranja?", "dieta cetogênica é boa?"), use a ferramenta `perform_rag_search`.
 
         Sempre responda em português brasileiro.
+
+        **IMPORTANTE:** O contexto do usuário também contém uma seção chamada 
+        'FEEDBACK DO USUÁRIO SOBRE RESPOSTAS ANTERIORES'. 
+        Analise esse feedback para entender o que o usuário gosta (POSITIVE) 
+        e não gosta (NEGATIVE) e ajuste seu tom e suas respostas de acordo.
     """,
     tools=agent_tools # Informar o modelo sobre as ferramentas
 )

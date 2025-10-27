@@ -1,16 +1,14 @@
 from fastapi import APIRouter, Header
 from pydantic import BaseModel
-from rag.rag_agent import responder_rag
+from orchestrator import run_orchestrator # Importa o novo orquestrador
 import requests
 import os
-from datetime import datetime
-import re
-import json
-
 
 SPRING_API_URL = os.getenv("SPRING_API_URL")
-
 router = APIRouter()
+
+# !! AVISO: O chat_history global não é ideal para produção (não escala para múltiplos usuários)
+# Mas estou mantendo para não quebrar sua lógica atual.
 chat_history = []
 
 
@@ -20,14 +18,15 @@ class Pergunta(BaseModel):
 
 @router.get("/")
 def root():
-    return {"message": "Agente NutriX com Gemini/ADK + RAG está funcionando!"}
+    return {"message": "Agente NutriX com Gemini (Orquestrador) + RAG está funcionando!"}
 
 @router.get("/meals")
 def get_meals(date: str = None, authorization: str = Header(None)):
+    # (Seu código original - sem alteração)
     headers = {"Authorization": authorization}
     url = f"{SPRING_API_URL}/api/meals"
     if date:
-        url += f"?date={date}"  # Assumindo que Spring suporta filter por data
+        url += f"?date={date}"
     resp = requests.get(url, headers=headers)
     return resp.json()
 
@@ -35,11 +34,12 @@ def get_meals(date: str = None, authorization: str = Header(None)):
 @router.post("/responder")
 async def responder(pergunta: Pergunta, authorization: str = Header(None)):
     global chat_history
-    contexto_usuario = "Contexto do usuário não pôde ser carregado."
+    contexto_usuario_completo = "Contexto do usuário não pôde ser carregado."
+    token = None
 
     try:
         # =======================
-        # 🔑 Autenticação e Headers
+        # 🔑 1. Autenticação e Headers
         # =======================
         token = authorization.split(" ")[1] if authorization else None
         if not token:
@@ -47,7 +47,7 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
         headers = {"Authorization": f"Bearer {token}"}
 
         # =======================
-        # 🧩 1. Buscar contexto principal (usuário + anamnese)
+        # 🧩 2. Buscar contexto (Usuário + Anamnese)
         # =======================
         user_url = f"{SPRING_API_URL}/api/users/context"
         response = requests.get(user_url, headers=headers)
@@ -58,10 +58,11 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
         anamnesis_data = full_context.get("anamnesis", {})
 
         # =======================
-        # 🍽️ 2. Buscar refeições do usuário
+        # 🍽️ 3. Buscar refeições
         # =======================
         meals_url = f"{SPRING_API_URL}/api/meals"
         meals_response = requests.get(meals_url, headers=headers)
+        refeicoes_texto = "Nenhuma refeição registrada recentemente."
 
         if meals_response.status_code == 200:
             meals_data = meals_response.json()
@@ -72,13 +73,12 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
                     for m in meals_data
                 ]
             )
-        else:
-            refeicoes_texto = "Nenhuma refeição registrada recentemente."
 
         # =======================
-        # 🧠 3. Montar contexto final para o modelo
+        # 🧠 4. Montar contexto final para o modelo
         # =======================
-        contexto_usuario = f"""
+        # (Seu código original de montagem de contexto - sem alteração)
+        contexto_usuario_completo = f"""
         Dados do usuário:
         - Nome: {user_data.get('name', 'N/A')}
         - Gênero: {user_data.get('gender', 'N/A')}
@@ -113,72 +113,22 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
         print(f"⚠️ Erro ao buscar contexto: {e}")
 
     # =======================
-    # 💬 4. Montar prompt completo
+    # 🤖 5. Chamar o Orquestrador
     # =======================
-    full_prompt = f"""
-    {contexto_usuario}
-
-    Histórico da conversa:
-    {chr(10).join(chat_history)}
-
-    Usuário: {pergunta.pergunta}
-
-    Instrução: Responda ao usuário de forma amigável.
-    Se a mensagem do usuário for um registro claro de uma refeição, extraia os dados nutricionais.
-    Após sua resposta em texto, coloque os dados da refeição em um bloco <JSON> no seguinte formato:
-    <JSON>
-    {{
-        "type": "...",
-        "description": "...",
-        "calories": ...,
-        "protein": ...,
-        "carbs": ...,
-        "fat": ...
-    }}
-    </JSON>
-    Se não for um registro de refeição, NÃO inclua o bloco <JSON>.
-    """
-
-    resposta_texto = responder_rag(full_prompt)
-
-    # =======================
-    # 💾 5. Processar e Salvar Refeição (se houver)
-    # =======================
-    meal_data = None
-    texto_para_usuario = resposta_texto # Resposta padrão é o texto completo
-    meal_saved = False
-
-    # Procure pelo bloco <JSON> na resposta
-    match = re.search(r"<JSON>\s*({.*?})\s*</JSON>", resposta_texto, re.DOTALL)
+    # Removemos toda a lógica de prompt, RAG e parsing de JSON daqui.
     
-    if match and token:
-        json_string = match.group(1)
-        try:
-            meal_data = json.loads(json_string)
-            required_fields = ["type", "description", "calories", "protein", "carbs", "fat"]
-            
-            # Verifica se o JSON está completo
-            if all(f in meal_data for f in required_fields):
-                headers = {"Authorization": f"Bearer {token}"}
-                post_url = f"{SPRING_API_URL}/api/meals"
-                response = requests.post(post_url, headers=headers, json=meal_data)
-                
-                if response.status_code in [200, 201]:
-                    meal_saved = True
-                    # Remove o bloco JSON da resposta que vai para o chat
-                    texto_para_usuario = re.sub(r"<JSON>.*?</JSON>", "", resposta_texto, flags=re.DOTALL).strip()
-                else:
-                    print(f"⚠️ Erro ao salvar refeição no Spring: {response.text}")
-            
-        except Exception as e:
-            print(f"⚠️ Erro ao processar JSON da IA: {e}")
-            pass # Ignora se o JSON for inválido
+    result = await run_orchestrator(
+        pergunta=pergunta.pergunta,
+        full_context=contexto_usuario_completo,
+        chat_history=chat_history,
+        authorization_token=token 
+    )
 
     # =======================
     # 🗣️ 6. Salvar no histórico e retornar
     # =======================
     chat_history.append(f"Usuário: {pergunta.pergunta}")
-    chat_history.append(f"Agente: {texto_para_usuario}") # Salva a resposta limpa
+    chat_history.append(f"Agente: {result['resposta']}") 
 
-    return {"resposta": texto_para_usuario, "meal_saved": meal_saved}
-
+    # Retorna a resposta final do orquestrador
+    return {"resposta": result['resposta'], "meal_saved": result['meal_saved']}

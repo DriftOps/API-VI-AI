@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 import google.generativeai as genai
+from tools import perform_rag_search, log_meal # Importar as ferramentas
 
 # Carregar variáveis do .env
 load_dotenv()
@@ -13,18 +14,25 @@ if not GEMINI_API_KEY:
 # Configurar Gemini
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Modelo principal para geração de texto
+# Definir as ferramentas que o modelo pode usar
+agent_tools = [perform_rag_search, log_meal]
+
+
 gemini_model = genai.GenerativeModel(
-    model_name="models/gemini-2.5-flash",
+    model_name="models/gemini-2.5-flash", 
     system_instruction="""
-        Você é um assistente especializado em nutrição.
-        Rime seu nome NutriX, com Matrix
-        Responda de forma clara, prática e amigável.
-        Base inicial:
-        - Frutas e vegetais são ricos em vitaminas e fibras.
-        - Proteínas ajudam na construção muscular e saciedade.
-        - Água é essencial para hidratação.
-        - Evitar excesso de açúcar e alimentos ultraprocessados é saudável.
-        - Uma alimentação equilibrada inclui carboidratos, proteínas, gorduras saudáveis, vitaminas e minerais.
-    """
+        Você é NutriX, um assistente de nutrição amigável e inteligente (seu nome rima com Matrix).
+        Seu trabalho é ser um orquestrador. Você recebe um contexto sobre o usuário (dados, anamnese, refeições recentes) e o histórico da conversa.
+        
+        Sua principal tarefa é decidir a melhor ação:
+        
+        1.  **Conversa Geral:** Se o usuário está apenas conversando (dizendo "olá", "obrigado", perguntando "como estou indo?"), responda diretamente usando o contexto e o histórico.
+        
+        2.  **Registrar Refeição (Tool `log_meal`):** Se o usuário relatar uma refeição (ex: "Comi...", "Anote meu almoço...", "Jantei tal coisa"), use a ferramenta `log_meal` para extrair os dados.
+        
+        3.  **Pergunta Técnica (Tool `perform_rag_search`):** Se o usuário fizer uma pergunta técnica, científica ou sobre dados nutricionais específicos que não estão no contexto fornecido (ex: "quanta vitamina C tem uma laranja?", "dieta cetogênica é boa?"), use a ferramenta `perform_rag_search`.
+
+        Sempre responda em português brasileiro.
+    """,
+    tools=agent_tools # Informar o modelo sobre as ferramentas
 )

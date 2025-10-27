@@ -86,11 +86,6 @@ async def run_orchestrator(pergunta: str, full_context: str, chat_history: list,
             else:
                 function_response_data = {"status": "Erro: Token de autorização não encontrado."}
         
-        # ==================================================================
-        # 5. Enviar a resposta da ferramenta de volta para o modelo
-        #    (MOVIDO PARA FORA DO 'elif' E SINTAXE CORRIGIDA)
-        # ==================================================================
-        
         response = chat_session.send_message(
             # Esta é a sintaxe correta:
             protos.Part(
@@ -100,9 +95,6 @@ async def run_orchestrator(pergunta: str, full_context: str, chat_history: list,
                 )
             )
         )
-        # Fim do 'while' loop, o loop verificará 'response.candidates' novamente
-
-    # 6. Resposta final (após o loop de ferramentas, ou se nenhuma ferramenta foi usada)
     final_response_text = response.text
     
     return {"resposta": final_response_text, "meal_saved": meal_saved}

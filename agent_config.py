@@ -14,30 +14,49 @@ if not GEMINI_API_KEY:
 # Configurar Gemini
 genai.configure(api_key=GEMINI_API_KEY)
 
+try:
+    with open("instruction.md", "r", encoding="utf-8") as f:
+        SYSTEM_INSTRUCTION = f.read()
+except FileNotFoundError:
+    print("ERRO CRÍTICO: Arquivo 'system_prompt.md' não encontrado.")
+    print("Por favor, crie o arquivo com as instruções do sistema.")
+    # Fallback muito simples apenas para não quebrar
+    SYSTEM_INSTRUCTION = "Você é um assistente de nutrição." 
+
+# --- [NOVO] Configurações de Geração (Temperatura, etc.) ---
+# Aqui você controla a "criatividade" e o comprimento da resposta.
+generation_config = {
+    # 'temperature': Controla a aleatoriedade.
+    # Valores mais baixos (ex: 0.3) = respostas mais diretas e consistentes (bom para fatos).
+    # Valores mais altos (ex: 0.9) = respostas mais criativas.
+    # Para um assistente didático, mas preciso, 0.7 é um bom começo.
+    "temperature": 0.7, 
+    
+    # 'max_output_tokens': Controla o tamanho MÁXIMO da resposta.
+    # Isso ajuda a forçar as "respostas mais curtas" que você pediu.
+    # 8192 é o padrão, vamos reduzir bastante. Ajuste conforme necessário.
+    "max_output_tokens": 2048, 
+    
+    # 'top_p': Outra forma de controlar a aleatoriedade. 1.0 é o padrão.
+    "top_p": 1.0, 
+    
+    # 'top_k': Limita a seleção de tokens. 1 é o padrão.
+    "top_k": 1,
+}
+
 # Definir as ferramentas que o modelo pode usar
 agent_tools = [perform_rag_search, log_meal]
 
 
 gemini_model = genai.GenerativeModel(
+
     model_name="models/gemini-2.5-flash", 
-    system_instruction="""
-        Você é NutriX, um assistente de nutrição amigável e inteligente (seu nome rima com Matrix).
-        Seu trabalho é ser um orquestrador. Você recebe um contexto sobre o usuário (dados, anamnese, refeições recentes) e o histórico da conversa.
-        
-        Sua principal tarefa é decidir a melhor ação:
-        
-        1.  **Conversa Geral:** Se o usuário está apenas conversando (dizendo "olá", "obrigado", perguntando "como estou indo?"), responda diretamente usando o contexto e o histórico.
-        
-        2.  **Registrar Refeição (Tool `log_meal`):** Se o usuário relatar uma refeição (ex: "Comi...", "Anote meu almoço...", "Jantei tal coisa"), use a ferramenta `log_meal` para extrair os dados.
-        
-        3.  **Pergunta Técnica (Tool `perform_rag_search`):** Se o usuário fizer uma pergunta técnica, científica ou sobre dados nutricionais específicos que não estão no contexto fornecido (ex: "quanta vitamina C tem uma laranja?", "dieta cetogênica é boa?"), use a ferramenta `perform_rag_search`.
+    
 
-        Sempre responda em português brasileiro.
+    system_instruction=SYSTEM_INSTRUCTION,
+    
 
-        **IMPORTANTE:** O contexto do usuário também contém uma seção chamada 
-        'FEEDBACK DO USUÁRIO SOBRE RESPOSTAS ANTERIORES'. 
-        Analise esse feedback para entender o que o usuário gosta (POSITIVE) 
-        e não gosta (NEGATIVE) e ajuste seu tom e suas respostas de acordo.
-    """,
-    tools=agent_tools # Informar o modelo sobre as ferramentas
+    generation_config=generation_config,
+    
+    tools=agent_tools 
 )

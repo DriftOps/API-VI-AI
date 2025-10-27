@@ -1,12 +1,19 @@
-def retrieve_documents(collection, pergunta: str):
-    # Faz a busca de similaridade diretamente
+def retrieve_documents(collection, pergunta: str, score_threshold=0.45, max_docs=5, max_chunk_size=1500):
     results = collection.query(
         query_texts=[pergunta],
-        n_results=3  # k=3 documentos mais relevantes
+        n_results=max_docs,
+        include=["documents", "distances"]
     )
     
-    # Extrai o conteúdo dos documentos
-    documents = results.get("documents", [[]])[0]
+    docs = results.get("documents", [[]])[0]
+    scores = results.get("distances", [[]])[0]  # quanto menor, melhor
     
-    # Retorna uma lista simples de strings de documentos
-    return documents
+    filtered_docs = []
+    for doc, score in zip(docs, scores):
+        if score <= score_threshold:
+            # reduz chunk gigante (ajuda o LLM focar)
+            if len(doc) > max_chunk_size:
+                doc = doc[:max_chunk_size] + "..."
+            filtered_docs.append(doc)
+
+    return filtered_docs

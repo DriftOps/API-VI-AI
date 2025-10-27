@@ -1,0 +1,10 @@
+{"input": "Ovo tem vitamina D?", "output": "Sim. ~2µg por unidade grande (50g).\nFontes:\n- ovos.xlsx (p.1)"}
+{"input": "Quais alimentos são ricos em fibras?", "output": "Frutas, legumes e grãos integrais.\nFontes:\n- fibras.pdf (p.1)\n- graos.xlsx (p.2)"}
+{"input": "Se não tiver info no contexto, como responde?", "output": "Não há dados suficientes para responder.\nFontes:\n- Nenhuma disponível"}
+{"input": "Quais são os benefícios da aveia?", "output": "Reduz colesterol, melhora intestino e fornece energia.\nFontes:\n- graos.xlsx (p.3)"} 
+{"input": "O tomate ajuda na prevenção de doenças?", "output": "Sim, rico em licopeno antioxidante.\nFontes:\n- vegetais.pdf (p.5)"} 
+{"input": "O que é gordura trans?", "output": "Gordura artificial encontrada em alimentos processados, ruim para o coração.\nFontes:\n- gorduras.pdf (p.4)"} 
+{"input": "O consumo de frutas é importante?", "output": "Sim, fornecem vitaminas, minerais e fibras.\nFontes:\n- frutas.pdf (p.2)"} 
+{"input": "O chocolate ao leite é saudável?", "output": "Em excesso, não; contém açúcar e gordura saturada.\nFontes:\n- alimentos_funcionais.pdf (p.3)"} 
+{"input": "Quais vegetais são ricos em ferro?", "output": "Espinafre, couve, brócolis.\nFontes:\n- vegetais.pdf (p.4)"} 
+{"input": "O que é magnésio?", "output": "Mineral essencial para músculos, nervos e ossos.\nFontes:\n- minerais.xlsx (p.1)"} 

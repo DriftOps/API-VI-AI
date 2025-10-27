@@ -1,0 +1,62 @@
+{"input": "Qual o teor de proteína do frango cozido?", "output": "Frango cozido tem cerca de 31g de proteína por 100g.\nFontes:\n- tabela_nutricional.xlsx (p.2)"}
+{"input": "Quantas calorias tem a maçã?", "output": "Maçã tem cerca de 52 kcal por 100g.\nFontes:\n- frutas.pdf (p.1)"}
+{"input": "Banana tem muito potássio?", "output": "Sim. Banana tem ~358mg de potássio por 100g.\nFontes:\n- frutas.pdf (p.3)"}
+{"input": "Arroz integral tem mais fibra que arroz branco?", "output": "Sim. Arroz integral: ~3.5g fibra. Arroz branco: ~0.4g.\nFontes:\n- graos.xlsx (p.1)"}
+{"input": "Qual a quantidade de ferro no espinafre?", "output": "Espinafre tem ~2.7mg de ferro por 100g.\nFontes:\n- legumes.pdf (p.4)"}
+{"input": "Leite é boa fonte de cálcio?", "output": "Sim. ~125mg de cálcio por 100ml.\nFontes:\n- laticinios.xlsx (p.1)"}
+{"input": "Quanto de açúcar tem o refrigerante comum?", "output": "Cerca de 10g de açúcar por 100ml.\nFontes:\n- bebidas.pdf (p.2)"}
+{"input": "Ovo tem vitamina D?", "output": "Sim. ~2µg por unidade grande (50g).\nFontes:\n- ovos.xlsx (p.1)"}
+{"input": "Quais alimentos são ricos em fibras?", "output": "Frutas, legumes e grãos integrais.\nFontes:\n- fibras.pdf (p.1)\n- graos.xlsx (p.2)"}
+{"input": "Se não tiver info no contexto, como responde?", "output": "Não há dados suficientes para responder.\nFontes:\n- Nenhuma disponível"}
+{"input": "Quantas calorias tem 100g de arroz branco?", "output": "Arroz branco tem cerca de 130 kcal por 100g.\nFontes:\n- graos.xlsx (p.1)"}
+{"input": "Qual o teor de proteína do feijão preto?", "output": "Feijão preto tem cerca de 9g de proteína por 100g cozido.\nFontes:\n- leguminosas.pdf (p.2)"}
+{"input": "O ovo é rico em vitamina D?", "output": "Sim, cerca de 2µg por unidade grande (50g).\nFontes:\n- ovos.xlsx (p.1)"}
+{"input": "A banana é rica em potássio?", "output": "Sim, cerca de 358mg de potássio por 100g.\nFontes:\n- frutas.pdf (p.3)"}
+{"input": "Qual a quantidade de ferro no espinafre?", "output": "Espinafre contém ~2.7mg de ferro por 100g.\nFontes:\n- vegetais.pdf (p.4)"}
+{"input": "O leite é uma boa fonte de cálcio?", "output": "Sim, aproximadamente 125mg de cálcio por 100ml.\nFontes:\n- laticinios.xlsx (p.1)"}
+{"input": "Quanto de açúcar tem um refrigerante comum?", "output": "Cerca de 10g de açúcar por 100ml.\nFontes:\n- bebidas.pdf (p.2)"}
+{"input": "Quais alimentos são ricos em fibras?", "output": "Frutas, legumes e grãos integrais.\nFontes:\n- fibras.pdf (p.1)\n- graos.xlsx (p.2)"}
+{"input": "A batata doce tem mais fibras que a batata comum?", "output": "Sim, batata doce ~3g de fibra, batata comum ~1.5g por 100g.\nFontes:\n- vegetais.pdf (p.3)"} 
+{"input": "O que é uma dieta balanceada?", "output": "Dieta balanceada inclui carboidratos, proteínas, gorduras, vitaminas e minerais em proporção adequada.\nFontes:\n- nutricao_basica.pdf (p.1)"}
+{"input": "O consumo de sal influencia a pressão arterial?", "output": "Sim, excesso de sal pode aumentar a pressão arterial.\nFontes:\n- saude_publica.pdf (p.5)"}
+{"input": "Qual a função das proteínas?", "output": "Proteínas são essenciais para construção e reparo muscular e tecidos.\nFontes:\n- nutrientes.xlsx (p.2)"}
+{"input": "Quantas calorias tem uma maçã?", "output": "Maçã tem cerca de 52 kcal por 100g.\nFontes:\n- frutas.pdf (p.1)"}
+{"input": "O abacate é rico em gorduras boas?", "output": "Sim, contém principalmente ácidos graxos monoinsaturados saudáveis.\nFontes:\n- frutas.pdf (p.4)"}
+{"input": "O que é vitamina C?", "output": "Vitamina C auxilia na imunidade e síntese de colágeno.\nFontes:\n- vitaminas.xlsx (p.1)"}
+{"input": "Quais alimentos contêm vitamina B12?", "output": "Carnes, ovos, leite e derivados.\nFontes:\n- vitaminas.xlsx (p.2)"}
+{"input": "O salmão é rico em ômega 3?", "output": "Sim, cerca de 1.5g de ômega 3 por 100g.\nFontes:\n- peixes.pdf (p.3)"}
+{"input": "O consumo de água diário recomendado é?", "output": "Cerca de 2 litros para adultos, variando conforme atividade e clima.\nFontes:\n- hidratacao.pdf (p.1)"}
+{"input": "Quais são os carboidratos complexos?", "output": "Arroz integral, aveia, batata doce e leguminosas.\nFontes:\n- carboidratos.pdf (p.2)"}
+{"input": "O consumo de gordura saturada deve ser limitado?", "output": "Sim, excesso aumenta risco cardiovascular.\nFontes:\n- gorduras.pdf (p.3)"}
+{"input": "O chocolate amargo é saudável?", "output": "Sim, em pequenas quantidades; rico em antioxidantes.\nFontes:\n- alimentos_funcionais.pdf (p.2)"}
+{"input": "Quais alimentos ajudam na digestão?", "output": "Iogurte, kefir, fibras de frutas e vegetais.\nFontes:\n- probioticos.pdf (p.1)"} 
+{"input": "O consumo de café influencia a saúde?", "output": "Moderado: pode aumentar alerta; excesso: ansiedade ou insônia.\nFontes:\n- bebidas.pdf (p.4)"} 
+{"input": "A cenoura é rica em qual vitamina?", "output": "Vitamina A (betacaroteno), importante para visão.\nFontes:\n- vegetais.pdf (p.2)"} 
+{"input": "O que é índice glicêmico?", "output": "Medida da velocidade que carboidratos elevam a glicose sanguínea.\nFontes:\n- carboidratos.pdf (p.3)"} 
+{"input": "O iogurte natural é bom para o intestino?", "output": "Sim, contém probióticos que ajudam a flora intestinal.\nFontes:\n- probioticos.pdf (p.2)"} 
+{"input": "O consumo de peixe é recomendado?", "output": "Sim, 2-3 vezes por semana, fonte de proteína e ômega 3.\nFontes:\n- peixes.pdf (p.1)"} 
+{"input": "A chia é fonte de fibras?", "output": "Sim, 34g de fibra por 100g.\nFontes:\n- sementes.pdf (p.1)"} 
+{"input": "Quais são os benefícios da aveia?", "output": "Reduz colesterol, melhora intestino e fornece energia.\nFontes:\n- graos.xlsx (p.3)"} 
+{"input": "O tomate ajuda na prevenção de doenças?", "output": "Sim, rico em licopeno antioxidante.\nFontes:\n- vegetais.pdf (p.5)"} 
+{"input": "O que é gordura trans?", "output": "Gordura artificial encontrada em alimentos processados, ruim para o coração.\nFontes:\n- gorduras.pdf (p.4)"} 
+{"input": "O consumo de frutas é importante?", "output": "Sim, fornecem vitaminas, minerais e fibras.\nFontes:\n- frutas.pdf (p.2)"} 
+{"input": "O chocolate ao leite é saudável?", "output": "Em excesso, não; contém açúcar e gordura saturada.\nFontes:\n- alimentos_funcionais.pdf (p.3)"} 
+{"input": "Quais vegetais são ricos em ferro?", "output": "Espinafre, couve, brócolis.\nFontes:\n- vegetais.pdf (p.4)"} 
+{"input": "O que é magnésio?", "output": "Mineral essencial para músculos, nervos e ossos.\nFontes:\n- minerais.xlsx (p.1)"} 
+{"input": "O café da manhã é importante?", "output": "Sim, fornece energia e melhora concentração.\nFontes:\n- nutricao_basica.pdf (p.3)"} 
+{"input": "Quais alimentos têm vitamina K?", "output": "Couve, brócolis, espinafre.\nFontes:\n- vegetais.pdf (p.3)"} 
+{"input": "O consumo de álcool influencia a nutrição?", "output": "Sim, excesso prejudica absorção de vitaminas e minerais.\nFontes:\n- saude_publica.pdf (p.6)"} 
+{"input": "O que são antioxidantes?", "output": "Compostos que neutralizam radicais livres, encontrados em frutas e vegetais.\nFontes:\n- vitaminas.xlsx (p.3)"} 
+{"input": "Quais alimentos ajudam no sistema imunológico?", "output": "Frutas cítricas, vegetais verdes, alho.\nFontes:\n- imunidade.pdf (p.2)"} 
+{"input": "O que é sódio?", "output": "Mineral essencial, mas excesso aumenta pressão arterial.\nFontes:\n- minerais.xlsx (p.2)"} 
+{"input": "O que são probióticos?", "output": "Bactérias benéficas para flora intestinal.\nFontes:\n- probioticos.pdf (p.1)"} 
+{"input": "O que é colesterol LDL?", "output": "Colesterol ruim, excesso aumenta risco cardiovascular.\nFontes:\n- gorduras.pdf (p.2)"} 
+{"input": "O que é colesterol HDL?", "output": "Colesterol bom, ajuda a remover excesso de LDL.\nFontes:\n- gorduras.pdf (p.2)"} 
+{"input": "O que é vitamina A?", "output": "Importante para visão, pele e imunidade.\nFontes:\n- vitaminas.xlsx (p.1)"} 
+{"input": "O que é vitamina E?", "output": "Antioxidante, protege células e tecidos.\nFontes:\n- vitaminas.xlsx (p.2)"} 
+{"input": "O que é cálcio?", "output": "Mineral essencial para ossos e dentes.\nFontes:\n- minerais.xlsx (p.1)"} 
+{"input": "O que é ferro?", "output": "Mineral essencial para transporte de oxigênio.\nFontes:\n- minerais.xlsx (p.1)"} 
+{"input": "O que é potássio?", "output": "Mineral importante para função muscular e cardíaca.\nFontes:\n- minerais.xlsx (p.2)"} 
+{"input": "Quais alimentos contêm vitamina B6?", "output": "Carnes, banana, grãos integrais.\nFontes:\n- vitaminas.xlsx (p.3)"} 
+{"input": "Quais alimentos contêm vitamina B9?", "output": "Vegetais verdes, feijão, laranja.\nFontes:\n- vitaminas.xlsx (p.4)"} 
+{"input": "Se não houver informação no contexto, como a IA deve responder?", "output": "Não há dados suficientes para responder.\nFontes:\n- Nenhuma disponível"}

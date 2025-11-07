@@ -1,8 +1,10 @@
+# routes.py
 from fastapi import APIRouter, Header
-from pydantic import BaseModel
-from orchestrator import run_orchestrator # Importa o novo orquestrador
+from pydantic import BaseModel, Field
+from orchestrator import run_orchestrator # Importa o orquestrador
 import requests
 import os
+from typing import List
 
 SPRING_API_URL = os.getenv("SPRING_API_URL")
 router = APIRouter()
@@ -11,6 +13,89 @@ router = APIRouter()
 class Pergunta(BaseModel):
     pergunta: str
 
+# =======================================================
+# (NOVO) DTOs (Pydantic Models) para o Rebalanceador de Dieta
+# =======================================================
+class DailyData(BaseModel):
+    target_calories: int
+    consumed_calories: int
+
+class AiBalanceRequest(BaseModel):
+    base_calories: int
+    safe_metabolic_floor: int
+    recent_days: List[DailyData]
+
+# =======================================================
+# (NOVO) Endpoint de Rebalanceamento da Dieta
+# =======================================================
+@router.post("/ai/balance-diet")
+def balance_diet(request: AiBalanceRequest):
+    """
+    Este endpoint é chamado pelo backend Java (DietBalanceJob) diariamente.
+    Ele recebe o histórico de consumo e recalcula a meta para os próximos dias.
+    """
+    base_calories = request.base_calories
+    safe_floor = request.safe_metabolic_floor
+    recent_days = request.recent_days
+
+    if not recent_days:
+        return {
+            "new_adjusted_calories": base_calories,
+            "ai_rationale": "Iniciando a dieta. Mantenha-se focado na sua meta base!"
+        }
+
+    # --- LÓGICA PRINCIPAL (O "DETALHE IMPORTANTE") ---
+    
+    # Usar apenas dias que já passaram (onde consumo > 0 ou target existe)
+    valid_days = [d for d in recent_days if d.consumed_calories > 0 or d.target_calories > 0]
+    if not valid_days:
+        valid_days = recent_days[:1] # Pega o primeiro dia se nenhum tiver consumo
+
+    avg_target = sum(d.target_calories for d in valid_days) / len(valid_days)
+    avg_consumed = sum(d.consumed_calories for d in valid_days) / len(valid_days)
+    
+    # Limite de tolerância (ex: 5%)
+    tolerance_threshold = avg_target * 1.05
+    
+    new_target = base_calories
+    rationale = f"Você está indo bem, mantendo o consumo próximo da meta de {base_calories} kcal. Continue assim!"
+
+    if avg_consumed > tolerance_threshold:
+        # Usuário está comendo DEMAIS
+        avg_excess = avg_consumed - avg_target
+        
+        # Fator de correção suave (ex: 50%)
+        correction_factor = 0.5 
+        correction_value = avg_excess * correction_factor
+        
+        new_target = base_calories - correction_value
+        
+        # --- A REGRA DE OURO (PISO MÍNIMO) ---
+        if new_target < safe_floor:
+            new_target = safe_floor
+            rationale = (f"Notei que seu consumo médio ({int(avg_consumed)} kcal) está acima da meta. "
+                         f"Ajustei sua meta para {int(new_target)} kcal, que é o seu piso metabólico seguro. "
+                         f"Vamos focar em voltar ao plano, mas sem medidas extremas!")
+        else:
+            rationale = (f"Notei que seu consumo médio ({int(avg_consumed)} kcal) ficou um pouco acima da meta. "
+                         f"Isso é normal! Para manter o progresso, ajustei sua meta suavemente "
+                         f"para {int(new_target)} kcal nos próximos dias.")
+
+    elif avg_consumed < (avg_target * 0.85) and avg_consumed > 0:
+        # Usuário está comendo DE MENOS (também é um problema)
+        new_target = base_calories
+        rationale = (f"Notei que seu consumo médio ({int(avg_consumed)} kcal) está bem abaixo da sua meta. "
+                     f"Lembre-se que um déficit muito grande pode prejudicar seu metabolismo. "
+                     f"Sua meta continua sendo {int(new_target)} kcal. Tente se aproximar dela.")
+
+    return {
+        "new_adjusted_calories": int(new_target),
+        "ai_rationale": rationale
+    }
+
+# =======================================================
+# Endpoints Existentes (Sem alteração de assinatura)
+# =======================================================
 
 @router.get("/")
 def root():
@@ -29,11 +114,10 @@ def get_meals(date: str = None, authorization: str = Header(None)):
 
 @router.post("/responder")
 async def responder(pergunta: Pergunta, authorization: str = Header(None)):
-    # Não usamos mais 'global chat_history'
     contexto_usuario_completo = "Contexto do usuário não pôde ser carregado."
     token = None
+    user_id = None # (NOVO)
     
-    # Listas que vamos preencher
     historico_para_gemini = []
     feedback_para_contexto = []
 
@@ -55,10 +139,12 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
         full_context = response.json()
         user_data = full_context.get("user", {})
         anamnesis_data = full_context.get("anamnesis", {})
+        user_id = user_data.get("id") # (NOVO) Captura o ID do usuário
 
         # =======================
         # 🍽️ 3. Buscar refeições
         # =======================
+        # (Seu código original - sem alteração)
         meals_url = f"{SPRING_API_URL}/api/meals"
         meals_response = requests.get(meals_url, headers=headers)
         refeicoes_texto = "Nenhuma refeição registrada recentemente."
@@ -73,31 +159,29 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
             )
 
         # =======================
-        # 💬 3b. [NOVO] Buscar Histórico de Chat e Feedback
+        # 💬 3b. Buscar Histórico de Chat e Feedback
         # =======================
+        # (Seu código original - sem alteração)
         history_url = f"{SPRING_API_URL}/api/chat/history"
         history_response = requests.get(history_url, headers=headers)
         
         if history_response.status_code == 200:
             chat_history_data = history_response.json()
-            
-            # Processa o histórico vindo do Java
             for msg in chat_history_data:
+                # ... (lógica de processamento de histórico) ...
                 sender = msg.get('sender')
                 message = msg.get('message')
-                feedback = msg.get('userFeedback') # 'positive', 'negative', ou null
+                feedback = msg.get('userFeedback') 
 
                 if sender == 'user':
                     historico_para_gemini.append(f"Usuário: {message}")
                 elif sender == 'assistant':
                     historico_para_gemini.append(f"Agente: {message}")
                     
-                    # Se esta mensagem do agente teve feedback, anota
                     if feedback:
-                        # Pega a pergunta do usuário que levou a esta resposta
                         pergunta_anterior = "N/A"
                         if historico_para_gemini and len(historico_para_gemini) > 1:
-                            pergunta_anterior = historico_para_gemini[-2] # Pega a penúltima msg (a do usuário)
+                            pergunta_anterior = historico_para_gemini[-2]
                         
                         feedback_para_contexto.append(
                             f"- Pergunta: \"{pergunta_anterior[9:70]}...\"\n"
@@ -107,16 +191,47 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
         else:
             print(f"⚠️ Erro ao buscar histórico: {history_response.text}")
 
+
+        # =======================
+        # 🥗 3c. [NOVO] Buscar Dieta Ativa
+        # =======================
+        dieta_ativa_texto = "Nenhuma dieta ativa no momento."
+        dieta_ativa_obj = None # (NOVO)
+        if user_id:
+            try:
+                # O endpoint que criamos no Java
+                diet_url = f"{SPRING_API_URL}/api/diets/active/{user_id}"
+                diet_response = requests.get(diet_url, headers=headers)
+                
+                if diet_response.status_code == 200:
+                    dieta_ativa_obj = diet_response.json() # (NOVO) Salva o objeto da dieta
+                    dieta_ativa_texto = f"""
+                    - Título: {dieta_ativa_obj.get('title')}
+                    - Período: {dieta_ativa_obj.get('startDate')} a {dieta_ativa_obj.get('endDate')}
+                    - Meta de Peso: {dieta_ativa_obj.get('targetWeight')} kg
+                    - Meta Base de Calorias: {dieta_ativa_obj.get('baseDailyCalories')} kcal
+                    - Último Racional da IA: {dieta_ativa_obj.get('aiRationale', 'Nenhum')}
+                    """
+                elif diet_response.status_code == 404:
+                    dieta_ativa_texto = "Nenhuma dieta ativa encontrada. Você pode pedir para eu criar uma."
+                else:
+                    # Informa o erro sem quebrar
+                    dieta_ativa_texto = f"Não foi possível buscar a dieta (status {diet_response.status_code})."
+            except Exception as diet_err:
+                print(f"⚠️ Erro ao buscar dieta: {diet_err}")
+                dieta_ativa_texto = "Erro ao conectar ao serviço de dietas."
+
+
         # =======================
         # 🧠 4. Montar contexto final para o modelo
         # =======================
-
         feedback_contexto_str = "Nenhum feedback registrado ainda."
         if feedback_para_contexto:
             feedback_contexto_str = "\n\n".join(feedback_para_contexto)
 
         contexto_usuario_completo = f"""
         Dados do usuário:
+        - ID: {user_data.get('id', 'N/A')} (Use isso para ferramentas)
         - Nome: {user_data.get('name', 'N/A')}
         - Gênero: {user_data.get('gender', 'N/A')}
         - Idade: {user_data.get('age', 'N/A')} anos
@@ -143,6 +258,10 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
         {refeicoes_texto}
 
         ---
+        [NOVO] DIETA ATIVA:
+        {dieta_ativa_texto}
+        ---
+
         [NOVO] FEEDBACK DO USUÁRIO SOBRE RESPOSTAS ANTERIORES:
         Use este feedback para aprender e ajustar suas respostas futuras.
         Respostas com 'NEGATIVE' devem ser evitadas. Respostas com 'POSITIVE' são bons exemplos.
@@ -160,15 +279,19 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
     # =======================
     # 🤖 5. Chamar o Orquestrador
     # =======================
-    # Removemos toda a lógica de prompt, RAG e parsing de JSON daqui.
     
     result = await run_orchestrator(
         pergunta=pergunta.pergunta,
         full_context=contexto_usuario_completo,
         chat_history=historico_para_gemini,
-        authorization_token=token 
+        authorization_token=token,
+        user_id=user_id, # (NOVO) Passa o user_id para as ferramentas
+        active_diet=dieta_ativa_obj # (NOVO) Passa a dieta para as ferramentas
     )
 
-
-    # Retorna a resposta final do orquestrador
-    return {"resposta": result['resposta'], "meal_saved": result['meal_saved']}
+    # Retorna a resposta final, agora incluindo 'diet_created'
+    return {
+        "resposta": result['resposta'], 
+        "meal_saved": result['meal_saved'],
+        "diet_created": result.get('diet_created', False) # (NOVO)
+    }

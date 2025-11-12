@@ -199,7 +199,7 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
         if user_id:
             try:
                 # O endpoint que criamos no Java
-                diet_url = f"{SPRING_API_URL}/api/diets/active/{user_id}"
+                diet_url = f"{SPRING_API_URL}/api/diets/active"
                 diet_response = requests.get(diet_url, headers=headers)
                 
                 if diet_response.status_code == 200:

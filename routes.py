@@ -1,4 +1,3 @@
-# routes.py
 from fastapi import APIRouter, Header
 from pydantic import BaseModel, Field
 from orchestrator import run_orchestrator # Importa o orquestrador
@@ -14,7 +13,7 @@ class Pergunta(BaseModel):
     pergunta: str
 
 # =======================================================
-# (NOVO) DTOs (Pydantic Models) para o Rebalanceador de Dieta
+# DTOs (Pydantic Models) para o Rebalanceador de Dieta
 # =======================================================
 class DailyData(BaseModel):
     target_calories: int

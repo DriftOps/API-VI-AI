@@ -116,7 +116,8 @@ def get_meals(date: str = None, authorization: str = Header(None)):
 async def responder(pergunta: Pergunta, authorization: str = Header(None)):
     contexto_usuario_completo = "Contexto do usuário não pôde ser carregado."
     token = None
-    user_id = None # (NOVO)
+    user_id = None
+    dieta_ativa_obj = None
     
     historico_para_gemini = []
     feedback_para_contexto = []

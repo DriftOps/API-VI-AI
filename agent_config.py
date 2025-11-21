@@ -47,16 +47,22 @@ generation_config = {
 # Definir as ferramentas que o modelo pode usar
 agent_tools = [perform_rag_search, log_meal]
 
+safety_settings = {
+    genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+    genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
+    genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+    genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+}
 
 gemini_model = genai.GenerativeModel(
 
-    model_name="models/gemini-2.5-flash", 
-    
+    model_name="models/gemini-2.5-flash",  
 
     system_instruction=SYSTEM_INSTRUCTION,
     
-
     generation_config=generation_config,
     
-    tools=agent_tools 
+    tools=agent_tools,
+
+    safety_settings=safety_settings
 )

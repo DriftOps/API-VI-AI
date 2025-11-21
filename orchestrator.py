@@ -2,7 +2,10 @@ import os
 import json
 import google.generativeai as genai
 from typing import Dict, Any, List
+import requests
 from tools import perform_rag_search, log_meal, create_diet, create_recipe
+
+SPRING_API_URL = os.getenv("SPRING_API_URL")
 
 # (Configuração do Gemini - seu código original)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -28,9 +31,12 @@ async def run_orchestrator(
     full_context: str, 
     chat_history: List[str], 
     authorization_token: str,
-    user_id: int,                 # (Recebido de routes.py)
-    active_diet: Dict[str, Any] | None # (Recebido de routes.py)
+    user_id: int,                 
+    active_diet: Dict[str, Any] | None
+
 ) -> Dict[str, Any]:
+
+    
 
     tools = [perform_rag_search, log_meal, create_diet, create_recipe]
 
@@ -43,6 +49,13 @@ async def run_orchestrator(
         else:
             # Segurança: se não tiver nenhum dos dois, não quebra
             tool_names.append(str(tool))
+
+    safety_settings = {
+        genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+        genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
+        genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+        genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+    }
     
     system_prompt = f"""
     Você é o NutriX, um assistente de IA nutricional avançado.
@@ -86,7 +99,8 @@ async def run_orchestrator(
     model = genai.GenerativeModel(
         model_name='gemini-2.5-flash',
         system_instruction=system_prompt,
-        tools=tools
+        tools=tools,
+        safety_settings=safety_settings
     )
 
     text_generation_model = genai.GenerativeModel(
@@ -190,8 +204,8 @@ async def run_orchestrator(
                 }
                 
                 headers = {"Authorization": f"Bearer {authorization_token}"}
-                url = f"{SPRING_API_URL}/api/diets"
-                
+                url = f"{os.getenv('SPRING_API_URL')}/api/diets"  
+
                 try:
                     print(f"--- Enviando para o Spring: {url} ---")
                     spring_response = requests.post(url, headers=headers, json=payload)

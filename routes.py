@@ -12,6 +12,7 @@ router = APIRouter()
 
 class Pergunta(BaseModel):
     pergunta: str
+    image: str | None = None
 
 # =======================================================
 # (NOVO) DTOs (Pydantic Models) para o Rebalanceador de Dieta
@@ -283,11 +284,12 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
     
     result = await run_orchestrator(
         pergunta=pergunta.pergunta,
+        image_data=pergunta.image, # <--- PASSE A IMAGEM AQUI
         full_context=contexto_usuario_completo,
         chat_history=historico_para_gemini,
         authorization_token=token,
-        user_id=user_id, # (NOVO) Passa o user_id para as ferramentas
-        active_diet=dieta_ativa_obj # (NOVO) Passa a dieta para as ferramentas
+        user_id=user_id,
+        active_diet=dieta_ativa_obj
     )
 
     # Retorna a resposta final, agora incluindo 'diet_created'

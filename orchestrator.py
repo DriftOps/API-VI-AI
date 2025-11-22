@@ -1,5 +1,8 @@
 import os
 import json
+import base64
+import io
+from PIL import Image
 import google.generativeai as genai
 from typing import Dict, Any, List
 import requests
@@ -7,14 +10,13 @@ from tools import perform_rag_search, log_meal, create_diet, create_recipe
 
 SPRING_API_URL = os.getenv("SPRING_API_URL")
 
-# (Configuração do Gemini - seu código original)
+# Configuração do Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY não configurada no ambiente.")
     
 genai.configure(api_key=GEMINI_API_KEY)
 
-# (Seu código original de 'clean_json_string')
 def clean_json_string(s):
     s = s.strip()
     if s.startswith("```json"):
@@ -25,18 +27,15 @@ def clean_json_string(s):
     return s
 
 
-# (ATUALIZADO) Assinatura da função principal
 async def run_orchestrator(
     pergunta: str, 
+    image_data: str | None,  # <--- NOVO PARÂMETRO
     full_context: str, 
     chat_history: List[str], 
     authorization_token: str,
     user_id: int,                 
     active_diet: Dict[str, Any] | None
-
 ) -> Dict[str, Any]:
-
-    
 
     tools = [perform_rag_search, log_meal, create_diet, create_recipe]
 
@@ -47,7 +46,6 @@ async def run_orchestrator(
         elif hasattr(tool, '__name__'):
             tool_names.append(tool.__name__)
         else:
-            # Segurança: se não tiver nenhum dos dois, não quebra
             tool_names.append(str(tool))
 
     safety_settings = {
@@ -79,6 +77,9 @@ async def run_orchestrator(
       
     - **log_meal**: Use esta ferramenta QUANDO e APENAS QUANDO o usuário registrar
       explicitamente o que comeu. Ex: "Hoje comi...", "Anote meu almoço: ..."
+      **ATENÇÃO:** Se você receber uma IMAGEM de comida, analise-a visualmente, estime 
+      as calorias e macronutrientes (Proteína, Carbo, Gordura) e chame `log_meal` 
+      IMEDIATAMENTE com sua estimativa. Não peça confirmação, apenas registre.
       
     - **create_diet**: Use esta ferramenta DIRETAMENTE (sem perguntar) quando o usuário
       pedir para "criar uma dieta", "iniciar um plano alimentar", "fazer uma nova dieta", etc.
@@ -96,8 +97,9 @@ async def run_orchestrator(
     - Sempre responda em Português (Brasil).
     """
 
+    # Inicializa o modelo (Flash é recomendado para Vision/Multimodal rápido)
     model = genai.GenerativeModel(
-        model_name='gemini-2.5-flash',
+        model_name='gemini-2.5-flash', # Mantendo o nome que você usava, mas verifique se 'gemini-1.5-flash' não é o correto para sua chave.
         system_instruction=system_prompt,
         tools=tools,
         safety_settings=safety_settings
@@ -107,10 +109,36 @@ async def run_orchestrator(
         model_name='gemini-2.5-flash'
     )
     
+    # --- LÓGICA DE PREPARAÇÃO DA MENSAGEM (TEXTO + IMAGEM) ---
+    msg_content = []
+    if pergunta:
+        msg_content.append(pergunta)
+    
+    if image_data:
+        try:
+            # Remove o cabeçalho do base64 se existir (ex: "data:image/png;base64,")
+            if "base64," in image_data:
+                image_data = image_data.split("base64,")[1]
+            
+            image_bytes = base64.b64decode(image_data)
+            image = Image.open(io.BytesIO(image_bytes))
+            
+            msg_content.append(image)
+            msg_content.append("\n[SISTEMA] O usuário enviou esta imagem. Se for comida, analise, estime calorias e chame log_meal.")
+            print("--- Imagem processada e adicionada ao prompt ---")
+        except Exception as e:
+            print(f"Erro ao processar imagem: {e}")
+            return {"resposta": f"Recebi a imagem, mas tive um erro ao processá-la: {e}", "meal_saved": False, "diet_created": False}
+
     convo = model.start_chat()
     
     try:
-        response = await convo.send_message_async(pergunta)
+        # Se a lista estiver vazia (user mandou nada), coloca um fallback
+        if not msg_content:
+             msg_content = ["Olá"] 
+
+        # O método send_message_async aceita uma lista mista [str, Image]
+        response = await convo.send_message_async(msg_content)
         response_content = response.parts[0]
     except Exception as e:
         print(f"Erro ao chamar o Gemini: {e}")
@@ -119,9 +147,10 @@ async def run_orchestrator(
     final_result_json = {
         "resposta": "",
         "meal_saved": False,
-        "diet_created": False # 
+        "diet_created": False
     }
 
+    # --- TRATAMENTO DE CHAMADA DE FERRAMENTAS ---
     if response_content.function_call:
         function_call = response_content.function_call
         function_name = function_call.name
@@ -146,11 +175,11 @@ async def run_orchestrator(
                 }
                 
                 headers = {"Authorization": f"Bearer {authorization_token}"}
-                url = f"{os.getenv('SPRING_API_URL')}/api/meals" # (Pega a URL do env)
+                url = f"{os.getenv('SPRING_API_URL')}/api/meals"
                 
                 try:
                     spring_response = requests.post(url, headers=headers, json=payload)
-                    spring_response.raise_for_status() # Lança erro se não for 2xx
+                    spring_response.raise_for_status() 
                     tool_result_text = f"Refeição '{payload['description']}' registrada com sucesso."
                     final_result_json['meal_saved'] = True
                 except requests.exceptions.HTTPError as http_err:
@@ -209,7 +238,7 @@ async def run_orchestrator(
                 try:
                     print(f"--- Enviando para o Spring: {url} ---")
                     spring_response = requests.post(url, headers=headers, json=payload)
-                    spring_response.raise_for_status() # Lança erro se não for 2xx
+                    spring_response.raise_for_status() 
                     
                     tool_result_text = (f"Dieta '{payload['title']}' criada com sucesso! "
                             f"Calculei uma meta base de {base_calories} kcal/dia. "
@@ -256,15 +285,12 @@ async def run_orchestrator(
                     raise Exception(f"Sub-IA de receita falhou em retornar um JSON. Resposta: {cleaned_response}")
 
                 ingredientes_lista = []
-                # Usamos .get('ingredients', []) para o caso da chave 'ingredients' nem existir
                 for item in recipe_data.get('ingredients', []):
                     if isinstance(item, dict):
-                        # Usamos .get() com valores padrão para evitar KeyErrors
                         amount = item.get('amount', 'A gosto')
                         name = item.get('name', 'Ingrediente')
                         ingredientes_lista.append(f"- {amount} de {name}")
                     elif isinstance(item, str):
-                        # Se a IA mandar só uma string (ex: "100g de Frango")
                         ingredientes_lista.append(f"- {item}")
 
                 passos_lista = []
@@ -272,7 +298,6 @@ async def run_orchestrator(
                     if isinstance(passo, str):
                         passos_lista.append(f"{i+1}. {passo}")
 
-                # Se, no final, as listas estiverem vazias, é porque o JSON falhou
                 if not ingredientes_lista or not passos_lista:
                     raise Exception(f"A sub-IA retornou um JSON, mas ele estava vazio ou malformado. Resposta: {cleaned_response}")
 
@@ -298,7 +323,6 @@ async def run_orchestrator(
             else:
                 tool_result_text = f"Erro: Ferramenta '{function_name}' desconhecida."
             
-            # Envia o resultado da ferramenta de volta para o modelo
             content_to_send = {
                 "function_response": {
                     "name": function_name,

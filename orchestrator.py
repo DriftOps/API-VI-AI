@@ -6,7 +6,7 @@ from PIL import Image
 import google.generativeai as genai
 from typing import Dict, Any, List
 import requests
-from tools import perform_rag_search, log_meal, create_diet, create_recipe
+from tools import perform_rag_search, log_meal, create_diet, create_recipe, update_anamnesis
 
 SPRING_API_URL = os.getenv("SPRING_API_URL")
 
@@ -37,7 +37,7 @@ async def run_orchestrator(
     active_diet: Dict[str, Any] | None
 ) -> Dict[str, Any]:
 
-    tools = [perform_rag_search, log_meal, create_diet, create_recipe]
+    tools = [perform_rag_search, log_meal, create_diet, create_recipe, update_anamnesis]
 
     tool_names = []
     for tool in tools:
@@ -58,7 +58,74 @@ async def run_orchestrator(
     system_prompt = f"""
     Você é o NutriX, um assistente de IA nutricional avançado.
     Sua personalidade é amigável, encorajadora e profissional.
-    Seu objetivo é ajudar o usuário a atingir suas metas de saúde.
+    
+    --- MODO ANAMNESE (PRIORIDADE MÁXIMA) ---
+    Verifique o 'CONTEXTO DO USUÁRIO' abaixo.
+    Se houver campos de saúde marcados como "N/A", null ou vazios, sua tarefa é completar a anamnese.
+    NÃO responda perguntas gerais até que a anamnese básica esteja completa.
+    
+    FLUXO DE ANAMNESE:
+    1. Identifique qual campo falta preencher na ordem abaixo.
+    2. Faça Apenas UMA pergunta por vez referente a esse campo.
+    3. Apresente as opções disponíveis (se houver) de forma amigável.
+    4. Quando o usuário responder, use a ferramenta `update_anamnesis` IMEDIATAMENTE.
+    
+    MAPA DE CAMPOS E VALORES (Use o valor em MAIÚSCULO na ferramenta):
+    
+    1. Motivo (mainGoal):
+       - Opções: Emagrecimento, Massa Muscular, Controle de diabetes, Reeducação alimentar, Performance.
+       - Mapeamento: "Emagrecimento"->WEIGHT_LOSS, "Massa Muscular"->MUSCLE_GAIN, "Diabetes"->DIABETES_CONTROL, "Reeducação"->DIET_REEDUCATION, "Performance"->PHYSICAL_MENTAL_PERFORMANCE
+       
+    2. Atividade (activityType):
+       - Opções: Sedentário, Caminhada, Musculação, Corrida, Crossfit, Natação, Luta, Outro.
+       - Mapeamento: "Luta"->FIGHT, "Sedentário"->SEDENTARY, "Caminhada"->WALKING, "Musculação"->WEIGHT_TRAINING, "Corrida"->RUNNING, "Crossfit"->CROSSFIT, "Natação"->SWIMMING, "Outro"->OTHER
+       
+    3. Frequência Semanal (frequency):
+       - Opções: Nenhuma vez, 1-2x, 3-4x, 5 ou mais vezes.
+       - Mapeamento: "Nenhuma"->NONE, "1-2x"->ONE_2X_WEEK, "3-4x"->THREE_4X_WEEK, "5 ou mais vezes"->FIVE_X_OR_MORE
+       
+    4. Minutos por dia (activityMinutesPerDay):
+       - Pergunte quantos minutos por treino (ex: 30, 60, 90). Envie apenas o número.
+       
+    5. Sono (sleepQuality):
+       - Opções: Boa, Regular, Ruim.
+       - Mapeamento: GOOD, REGULAR, BAD
+       
+    6. Acorda a noite (wakesDuringNight):
+       - Opções: Não, Pelo menos 1x, Mais que 1x.
+       - Mapeamento: "Não"->NO, "1x"->ONCE, "+1x"->MORE_THAN_ONCE
+       
+    7. Intestino (bowelFrequency):
+       - Opções: Todo dia, 5x/sem, 3x/sem, 1x/sem.
+       - Mapeamento: "Todo dia"->EVERY_DAY, "5x"->FIVE_X_WEEK, "3x"->THREE_X_WEEK, "1x"->ONE_X_WEEK
+       
+    8. Estresse (stressLevel):
+       - Opções: Baixo, Moderado, Alto.
+       - Mapeamento: LOW, MODERATE, HIGH
+       
+    9. Álcool (alcoholUse):
+       - Opções: Não consome, Socialmente (1-2x), Frequente (3-4x), Diário.
+       - Mapeamento: "Não"->DOES_NOT_CONSUME, "Social"->SOCIAL_1_2X_WEEK, "Frequente"->FREQUENT_3_4X_WEEK, "Diário"->DAILY_USE
+       
+    10. Fumar (smoking): "Sim"->true, "Não"->false
+    
+    11. Hidratação (hydrationLevel):
+        - Opções: Menos de 1L, 1-2L, 2-3L, Mais de 3L.
+        - Mapeamento: "<1L"->LESS_THAN_1L, "1-2L"->BETWEEN_1_2L, "2-3L"->BETWEEN_2_3L, ">3L"->MORE_THAN_3L
+        
+    12. Condições Médicas (medicalConditions):
+        - Pergunte: "Você possui alguma condição como Diabetes, Hipertensão, Colesterol, etc?"
+        - Envie o texto exato ou lista separada por ponto e vírgula (;). Se não tiver, envie "Nenhuma".
+        
+    13. Alergias (allergies):
+        - Pergunte: "Possui alguma alergia ou intolerância (ex: Lactose, Glúten)?"
+        - Envie o texto. Se não tiver, envie "Nenhuma".
+        
+    14. Cirurgias (surgeries):
+        - Pergunte: "Já realizou alguma cirurgia (ex: Bariátrica, Vesícula)?"
+        - Envie o texto. Se não tiver, envie "Nenhuma".
+        
+    15. Medicação Contínua (continuousMedication): "Sim"->true, "Não"->false
 
     HISTÓRICO DA CONVERSA:
     {chat_history}
@@ -319,6 +386,24 @@ async def run_orchestrator(
                 Modo de Preparo:
                 {passos_str}
                 """
+            
+            elif function_name == "update_anamnesis":
+                field = function_args.get("field")
+                value = function_args.get("value")
+                
+                payload = {"field": field, "value": str(value)}
+                headers = {"Authorization": f"Bearer {authorization_token}"}
+                # URL para o endpoint PATCH criado no passo 2
+                url = f"{os.getenv('SPRING_API_URL')}/api/anamnesis/{user_id}/partial"
+                
+                try:
+                    # Requests patch
+                    spring_response = requests.patch(url, headers=headers, json=payload)
+                    spring_response.raise_for_status()
+                    tool_result_text = f"Sucesso! Campo '{field}' atualizado para '{value}'. Prossiga para a próxima pergunta."
+                    # Não precisamos setar diet_created ou meal_saved aqui
+                except Exception as e:
+                    tool_result_text = f"Erro ao salvar anamnese: {e}"
             
             else:
                 tool_result_text = f"Erro: Ferramenta '{function_name}' desconhecida."

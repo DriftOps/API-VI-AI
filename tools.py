@@ -95,3 +95,18 @@ def create_recipe(query: str, constraints: str = None) -> dict:
         "query": query,
         "constraints": constraints or "Nenhuma restrição adicional."
     }
+
+def update_anamnesis(field: str, value: str) -> dict:
+    """
+    Atualiza um campo específico da anamnese do usuário no banco de dados.
+    Use esta ferramenta Imediatamente após o usuário responder a uma pergunta de anamnese.
+    
+    Args:
+        field (str): O nome do campo técnico (ex: 'mainGoal', 'sleepQuality').
+        value (str): O valor correspondente ao ENUM ou o texto livre (ex: 'WEIGHT_LOSS', 'GOOD', 'true').
+    """
+    print(f"--- Ferramenta UPDATE_ANAMNESIS ativada: {field} = {value} ---")
+    return {
+        "field": field,
+        "value": value
+    }

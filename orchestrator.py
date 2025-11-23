@@ -116,13 +116,43 @@ async def run_orchestrator(
     12. Condições Médicas (medicalConditions):
         - Pergunte: "Você possui alguma condição como Diabetes, Hipertensão, Colesterol, etc?"
         - Envie o texto exato ou lista separada por ponto e vírgula (;). Se não tiver, envie "Nenhuma".
+
+        - IMPORTANTE: Mapeie a resposta do usuário para as opções EXATAS abaixo.
+        CONDIÇÕES MÉDICAS VÁLIDAS:
+
+        * Diabetes tipo 1
+          * Diabetes tipo 2
+          * Hipertensão arterial (Use se falar "pressão alta")
+          * Dislipidemia (colesterol, triglicerídeos) (Use se falar "colesterol" ou "gordura no sangue")
+          * Doença renal
+          * Doença hepática
+          * Gastrite / refluxo
+          * Intestino preso / diarreia
+          * Osteoporose
+          * Doença cardiovascular (infarto, insuficiência cardíaca)
+          * Câncer
+          * Depressão / Ansiedade
+          * Doenças autoimunes
+        - Se tiver múltiplas, separe por vírgula. Se não tiver nenhuma, envie "Nenhuma".
         
     13. Alergias (allergies):
         - Pergunte: "Possui alguma alergia ou intolerância (ex: Lactose, Glúten)?"
+
+        - IMPORTANTE: Mapeie a resposta do usuário para as opções EXATAS abaixo.
+        OPÇÕES DE ALERGIAS VÁLIDAS:
+
+        "Intolerância à lactose", "Sensibilidade ao glúten / doença celíaca", "Alergia alimentar", "Alergia medicamentosa".
+
         - Envie o texto. Se não tiver, envie "Nenhuma".
         
     14. Cirurgias (surgeries):
         - Pergunte: "Já realizou alguma cirurgia (ex: Bariátrica, Vesícula)?"
+
+        - IMPORTANTE: Mapeie a resposta do usuário para as opções EXATAS abaixo.
+        OPÇÕES DE CIRURGIAS VÁLIDAS:
+
+        "Bariátrica", "Vesícula", "Hérnia de hiato", "Ortopédica", "Cesárea / Ginecológica".
+
         - Envie o texto. Se não tiver, envie "Nenhuma".
         
     15. Medicação Contínua (continuousMedication): "Sim"->true, "Não"->false

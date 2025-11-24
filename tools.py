@@ -7,13 +7,27 @@ import google.generativeai as genai
 from pydantic import BaseModel, Field
 from langchain_core.tools import tool
 
-# --- Inicialização do RAG ---
-# Carregamos a coleção aqui para que a ferramenta RAG possa usá-la
-print("Carregando coleção RAG...")
-doc_files = [os.path.join("data", f) for f in os.listdir("data") if f.endswith((".pdf", ".xlsx"))]
-rag_collection = load_documents_to_chroma(doc_files)
-print("Coleção RAG carregada com sucesso.")
+# --- (CORREÇÃO) Variável Global de Cache ---
+_rag_collection_cache = None
 
+def get_rag_collection():
+    """
+    Carrega a coleção apenas na primeira vez que for chamada (Lazy Loading).
+    Isso evita o crash de multiprocessing no Windows.
+    """
+    global _rag_collection_cache
+    
+    if _rag_collection_cache is None:
+        print("--- 📥 Inicializando coleção RAG (Lazy Load) ---")
+        if os.path.exists("data"):
+            doc_files = [os.path.join("data", f) for f in os.listdir("data") if f.endswith((".pdf", ".xlsx"))]
+            _rag_collection_cache = load_documents_to_chroma(doc_files)
+            print("--- ✅ Coleção RAG carregada com sucesso ---")
+        else:
+            print("--- ⚠️ Pasta 'data' não encontrada. RAG vazio. ---")
+            return None
+            
+    return _rag_collection_cache
 
 # --- Ferramenta 1: Agente RAG ---
 def perform_rag_search(query: str) -> dict:
@@ -25,7 +39,14 @@ def perform_rag_search(query: str) -> dict:
     Não use para registrar refeições ou conversas gerais.
     """
     print(f"--- 🛠️ Ferramenta RAG ativada com a query: {query} ---")
-    docs = retrieve_documents(rag_collection, query)
+    
+    # (CORREÇÃO) Chama a função getter em vez da variável direta
+    collection = get_rag_collection()
+    
+    if not collection:
+        return {"erro": "A coleção de documentos não pôde ser carregada ou está vazia."}
+
+    docs = retrieve_documents(collection, query)
     contexto = "\n".join(docs)
     
     # Retorna o contexto encontrado para a IA

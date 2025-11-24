@@ -3,7 +3,7 @@ import pandas as pd
 import chromadb
 from PyPDF2 import PdfReader
 from chromadb.utils.embedding_functions import GoogleGenerativeAiEmbeddingFunction
-from langchain.text_splitter import CharacterTextSplitter
+from langchain_text_splitters import CharacterTextSplitter
 from dotenv import load_dotenv
 
 load_dotenv()

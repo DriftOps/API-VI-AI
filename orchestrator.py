@@ -33,7 +33,7 @@ async def run_orchestrator(
     full_context: str, 
     chat_history: List[str], 
     authorization_token: str,
-    user_id: int,                 
+    user_id: int,
     active_diet: Dict[str, Any] | None
 ) -> Dict[str, Any]:
 

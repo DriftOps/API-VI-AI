@@ -279,7 +279,8 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
     
     result = await run_orchestrator(
         pergunta=pergunta.pergunta,
-        image_data=pergunta.image, # <--- PASSE A IMAGEM AQUI
+        image_data=pergunta.image,
+        user_coords={"lat": pergunta.latitude, "lng": pergunta.longitude},
         full_context=contexto_usuario_completo,
         chat_history=historico_para_gemini,
         authorization_token=token,

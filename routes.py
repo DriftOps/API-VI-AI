@@ -26,71 +26,66 @@ class AiBalanceRequest(BaseModel):
     safe_metabolic_floor: int
     recent_days: List[DailyData]
 
+class AiBalanceResponse(BaseModel):
+    next_days_targets: List[int] # AGORA É UMA LISTA
+    ai_rationale: str
+
 # =======================================================
 # (NOVO) Endpoint de Rebalanceamento da Dieta
 # =======================================================
 @router.post("/ai/balance-diet")
 def balance_diet(request: AiBalanceRequest):
-    """
-    Este endpoint é chamado pelo backend Java (DietBalanceJob) diariamente.
-    Ele recebe o histórico de consumo e recalcula a meta para os próximos dias.
-    """
     base_calories = request.base_calories
     safe_floor = request.safe_metabolic_floor
     recent_days = request.recent_days
 
+    # 1. Definição padrão (Plano Base) - 7 dias com a meta base
+    standard_plan = [base_calories] * 7 
+
     if not recent_days:
         return {
-            "new_adjusted_calories": base_calories,
+            "next_days_targets": standard_plan,
             "ai_rationale": "Iniciando a dieta. Mantenha-se focado na sua meta base!"
         }
 
-    # --- LÓGICA PRINCIPAL (O "DETALHE IMPORTANTE") ---
-    
-    # Usar apenas dias que já passaram (onde consumo > 0 ou target existe)
-    valid_days = [d for d in recent_days if d.consumed_calories > 0 or d.target_calories > 0]
+    # 2. Calcular Média e Excesso
+    valid_days = [d for d in recent_days if d.consumed_calories > 0]
     if not valid_days:
-        valid_days = recent_days[:1] # Pega o primeiro dia se nenhum tiver consumo
+        return { "next_days_targets": standard_plan, "ai_rationale": "Sem dados suficientes ainda." }
 
     avg_target = sum(d.target_calories for d in valid_days) / len(valid_days)
     avg_consumed = sum(d.consumed_calories for d in valid_days) / len(valid_days)
     
-    # Limite de tolerância (ex: 5%)
-    tolerance_threshold = avg_target * 1.05
-    
-    new_target = base_calories
-    rationale = f"Você está indo bem, mantendo o consumo próximo da meta de {base_calories} kcal. Continue assim!"
+    rationale = f"Seu consumo está dentro do planejado. Mantive as metas base."
+    final_plan = list(standard_plan)
 
-    if avg_consumed > tolerance_threshold:
-        # Usuário está comendo DEMAIS
-        avg_excess = avg_consumed - avg_target
+    # 3. Lógica de Recuperação Inteligente
+    if avg_consumed > (avg_target * 1.05): # Se excedeu 5%
+        daily_excess = avg_consumed - avg_target
+        # Supondo que queremos recuperar esse excesso diluído em 3 dias (33% por dia)
+        # para não ser muito agressivo
+        debt_per_day = daily_excess * 0.5 # Cobra 50% do excesso (fator de suavização)
         
-        # Fator de correção suave (ex: 50%)
-        correction_factor = 0.5 
-        correction_value = avg_excess * correction_factor
+        # Cria a curva de recuperação
+        rationale = "Notei o excesso calórico recente. Ajustei as metas dos próximos 3 dias para compensar suavemente, sem restringir demais."
         
-        new_target = base_calories - correction_value
-        
-        # --- A REGRA DE OURO (PISO MÍNIMO) ---
-        if new_target < safe_floor:
-            new_target = safe_floor
-            rationale = (f"Notei que seu consumo médio ({int(avg_consumed)} kcal) está acima da meta. "
-                         f"Ajustei sua meta para {int(new_target)} kcal, que é o seu piso metabólico seguro. "
-                         f"Vamos focar em voltar ao plano, mas sem medidas extremas!")
-        else:
-            rationale = (f"Notei que seu consumo médio ({int(avg_consumed)} kcal) ficou um pouco acima da meta. "
-                         f"Isso é normal! Para manter o progresso, ajustei sua meta suavemente "
-                         f"para {int(new_target)} kcal nos próximos dias.")
+        for i in range(7):
+            if i < 3: # Nos primeiros 3 dias, aplica a redução
+                new_val = base_calories - debt_per_day
+                # Regra do Piso Seguro (Nunca baixar demais)
+                if new_val < safe_floor:
+                    new_val = safe_floor
+                final_plan[i] = int(new_val)
+            else:
+                # Do 4º dia em diante, volta ao normal
+                final_plan[i] = base_calories
 
-    elif avg_consumed < (avg_target * 0.85) and avg_consumed > 0:
-        # Usuário está comendo DE MENOS (também é um problema)
-        new_target = base_calories
-        rationale = (f"Notei que seu consumo médio ({int(avg_consumed)} kcal) está bem abaixo da sua meta. "
-                     f"Lembre-se que um déficit muito grande pode prejudicar seu metabolismo. "
-                     f"Sua meta continua sendo {int(new_target)} kcal. Tente se aproximar dela.")
+    elif avg_consumed < (avg_target * 0.85): # Se comeu muito pouco
+        rationale = "Você está comendo abaixo da meta. Cuidado para não perder massa magra. Mantive a meta base para você recuperar."
+        final_plan = standard_plan # Mantém a base para incentivar comer
 
     return {
-        "new_adjusted_calories": int(new_target),
+        "next_days_targets": final_plan,
         "ai_rationale": rationale
     }
 

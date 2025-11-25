@@ -6,7 +6,7 @@ from PIL import Image
 import google.generativeai as genai
 from typing import Dict, Any, List
 import requests
-from tools import perform_rag_search, log_meal, create_diet, create_recipe, update_anamnesis
+from tools import perform_rag_search, log_meal, create_diet, create_recipe, update_anamnesis, search_nearby_places
 
 SPRING_API_URL = os.getenv("SPRING_API_URL")
 
@@ -37,7 +37,7 @@ async def run_orchestrator(
     active_diet: Dict[str, Any] | None
 ) -> Dict[str, Any]:
 
-    tools = [perform_rag_search, log_meal, create_diet, create_recipe, update_anamnesis]
+    tools = [perform_rag_search, log_meal, create_diet, create_recipe, update_anamnesis, search_nearby_places]
 
     tool_names = []
     for tool in tools:
@@ -185,6 +185,15 @@ async def run_orchestrator(
     - **create_recipe**: Use esta ferramenta DIRETAMENTE (sem perguntar) quando o usuário
       pedir para "criar uma receita", "me dê uma ideia de jantar", "sugira um prato", etc.
       Extraia a 'query' (o que ele quer) e 'constraints' (restrições como calorias, tempo).
+
+    - **search_nearby_places**: Use esta ferramenta para encontrar locais físicos
+      (mercados, academias, restaurantes, parques) próximos ao usuário.
+      Argumentos:
+      - 'query': O que buscar (ex: "academia", "loja de suplementos", "mercado saudável").
+      - 'location_description': O endereço ou bairro de referência.
+      IMPORTANTE: Procure no 'CONTEXTO DO USUÁRIO' acima o campo 'Endereço' ou 'Localização Base'.
+      Use esse valor exato para o argumento 'location_description'.
+      Se o contexto não tiver endereço, PEÇA para o usuário informar a localização antes de chamar a ferramenta. 
       
     - Se a pergunta do usuário não se encaixa em nenhuma ferramenta,
       responda usando o CONTEXTO DO USUÁRIO e o HISTÓRICO.
@@ -431,6 +440,22 @@ async def run_orchestrator(
                     # Não precisamos setar diet_created ou meal_saved aqui
                 except Exception as e:
                     tool_result_text = f"Erro ao salvar anamnese: {e}"
+
+            elif function_name == "search_nearby_places":
+                query = function_args.get("query")
+                location = function_args.get("location_description")
+                
+                print(f"--- 🗺️ Buscando locais: '{query}' em '{location}' ---")
+                
+                # Chama a função importada do tools.py
+                # Nota: Certifique-se de que o tools.py retorna um dict ou string
+                result = search_nearby_places(query, location)
+                
+                # Converte para string para o Gemini ler
+                if isinstance(result, dict):
+                    tool_result_text = json.dumps(result, ensure_ascii=False)
+                else:
+                    tool_result_text = str(result)
             
             else:
                 tool_result_text = f"Erro: Ferramenta '{function_name}' desconhecida."

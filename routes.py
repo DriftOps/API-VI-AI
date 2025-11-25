@@ -138,6 +138,18 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
         anamnesis_data = full_context.get("anamnesis", {})
         user_id = user_data.get("id") # (NOVO) Captura o ID do usuário
 
+        # Extrair e formatar endereço para o contexto
+        endereco_obj = user_data.get('address', {})
+        endereco_str = "Endereço não cadastrado."
+
+        if endereco_obj:
+        # Monta uma string legível: "Rua X, Bairro Y, Cidade Z"
+            logradouro = endereco_obj.get('logradouro', '')
+            bairro = endereco_obj.get('bairro', '')
+            cidade = endereco_obj.get('cidade', '')
+            uf = endereco_obj.get('uf', '')
+            endereco_str = f"{logradouro}, {bairro} - {cidade}/{uf}"
+
         # =======================
         # 🍽️ 3. Buscar refeições
         # =======================
@@ -234,6 +246,7 @@ async def responder(pergunta: Pergunta, authorization: str = Header(None)):
         - Idade: {user_data.get('age', 'N/A')} anos
         - Peso: {user_data.get('weight', 'N/A')} kg
         - Altura: {user_data.get('height', 'N/A')} cm
+        - Localização Base (Endereço): {endereco_str}
 
         Anamnese e Hábitos:
         - Objetivo Principal: {anamnesis_data.get('mainGoal', 'N/A')}

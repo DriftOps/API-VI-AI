@@ -1,11 +1,19 @@
 from rag.rag_loader import load_documents_to_chroma
 from rag.rag_retriever import retrieve_documents
 import os
+import googlemaps
 import requests
 import json
 import google.generativeai as genai
 from pydantic import BaseModel, Field
 from langchain_core.tools import tool
+
+gmaps = None
+try:
+    if os.getenv("GOOGLE_MAPS_API_KEY"):
+        gmaps = googlemaps.Client(key=os.getenv("GOOGLE_MAPS_API_KEY"))
+except Exception as e:
+    print(f"⚠️ Erro ao iniciar Google Maps: {e}")
 
 # --- (CORREÇÃO) Variável Global de Cache ---
 _rag_collection_cache = None
@@ -131,3 +139,64 @@ def update_anamnesis(field: str, value: str) -> dict:
         "field": field,
         "value": value
     }
+
+gmaps = None
+try:
+    if os.getenv("GOOGLE_MAPS_API_KEY"):
+        gmaps = googlemaps.Client(key=os.getenv("GOOGLE_MAPS_API_KEY"))
+except Exception as e:
+    print(f"⚠️ Erro ao iniciar Google Maps: {e}")
+
+def search_nearby_places(query: str, location_description: str = None) -> dict:
+    """
+    Busca locais físicos próximos (mercados, academias, restaurantes) usando o Google Maps.
+    Use esta ferramenta quando o usuário perguntar "onde comprar x", "academias perto daqui", 
+    "onde posso treinar", etc.
+    
+    Args:
+        query (str): O que buscar (ex: 'academia', 'loja de suplementos', 'mercado saudável').
+        location_description (str): Cidade e Bairro ou endereço completo do usuário para referência.
+    """
+    print(f"--- 🛠️ Ferramenta SEARCH_PLACES ativada: {query} em {location_description} ---")
+
+    if not gmaps:
+        return {"erro": "API do Google Maps não configurada."}
+
+    if not location_description:
+        return {"erro": "Não sei a localização do usuário. Peça para ele atualizar o perfil com o endereço."}
+
+    try:
+        # 1. Geocoding: Transforma o texto do endereço (Profile) em Lat/Long
+        geocode_result = gmaps.geocode(location_description)
+        
+        if not geocode_result:
+            return {"erro": f"Não consegui encontrar coordenadas para: {location_description}"}
+
+        location_lat_lng = geocode_result[0]['geometry']['location']
+
+        # 2. Places Search: Busca o que o usuário quer perto daquela Lat/Long
+        places_result = gmaps.places_nearby(
+            location=location_lat_lng,
+            keyword=query,
+            radius=3000, # Raio de 3km
+            open_now=False,
+            type='point_of_interest'
+        )
+
+        results = []
+        for place in places_result.get('results', [])[:5]: # Pega os top 5
+            results.append({
+                "nome": place.get('name'),
+                "endereco": place.get('vicinity'),
+                "nota": place.get('rating', 'N/A'),
+                "status": "Aberto agora" if place.get('opening_hours', {}).get('open_now') else "Fechado ou horário desconhecido"
+            })
+
+        if not results:
+            return {"mensagem": "Não encontrei locais próximos com esses termos."}
+
+        return {"locais_encontrados": results}
+
+    except Exception as e:
+        print(f"Erro na API do Google: {e}")
+        return {"erro": f"Falha ao comunicar com Google Maps: {str(e)}"}

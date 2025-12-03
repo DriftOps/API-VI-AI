@@ -6,7 +6,7 @@ from PIL import Image
 import google.generativeai as genai
 from typing import Dict, Any, List
 import requests
-from tools import perform_rag_search, log_meal, create_diet, create_recipe, update_anamnesis
+from tools import perform_rag_search, log_meal, create_diet, create_recipe, update_anamnesis, generate_menu_plan
 
 SPRING_API_URL = os.getenv("SPRING_API_URL")
 
@@ -29,7 +29,7 @@ def clean_json_string(s):
 
 async def run_orchestrator(
     pergunta: str, 
-    image_data: str | None,  # <--- NOVO PARÂMETRO
+    image_data: str | None,
     full_context: str, 
     chat_history: List[str], 
     authorization_token: str,
@@ -37,7 +37,7 @@ async def run_orchestrator(
     active_diet: Dict[str, Any] | None
 ) -> Dict[str, Any]:
 
-    tools = [perform_rag_search, log_meal, create_diet, create_recipe, update_anamnesis]
+    tools = [perform_rag_search, log_meal, create_diet, create_recipe, update_anamnesis, generate_menu_plan]
 
     tool_names = []
     for tool in tools:
@@ -55,14 +55,21 @@ async def run_orchestrator(
         genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
     }
     
+    # --- MUDANÇA 1: PERSONALIDADE AJUSTADA E PROIBIÇÃO DE EMOJIS ---
     system_prompt = f"""
     Você é o NutriX, um assistente de IA nutricional avançado.
-    Sua personalidade é amigável, encorajadora e profissional.
+    Sua personalidade é estritamente PROFISSIONAL, CLÍNICA e OBJETIVA.
+    Você deve agir como um nutricionista sério em um ambiente de consulta.
 
-    --- DIRETRIZES DE SEGURANÇA E ESCOPO (PRIORIDADE MÁXIMA) ---
+    --- REGRAS DE ESTILO (PRIORIDADE MÁXIMA) ---
+    1. NÃO USE EMOJIS. Em nenhuma hipótese.
+    2. Seja direto e baseie suas respostas em fatos e no contexto clínico do usuário.
+    3. Evite gírias ou linguagem excessivamente casual. Mantenha a formalidade.
+
+    --- DIRETRIZES DE SEGURANÇA E ESCOPO ---
     1. SEU PAPEL: Você é EXCLUSIVAMENTE um assistente de nutrição, saúde e bem-estar.
     2. RESTRIÇÃO DE TÓPICOS: RECUSE educadamente responder sobre qualquer assunto não relacionado a nutrição, saúde ou alimentação (ex: política, religião, programação, conhecimentos gerais fora da saúde, fofocas, etc.).
-    3. EXEMPLO DE RECUSA: "Desculpe, como assistente NutriX, meu foco é exclusivamente em sua nutrição e saúde. Como posso ajudar com sua alimentação hoje?"
+    3. EXEMPLO DE RECUSA: "Como assistente NutriX, meu foco restringe-se à sua nutrição e saúde clínica. Como posso auxiliar com seu plano alimentar?"
     
     --- MODO ANAMNESE (PRIORIDADE ALTA) ---
     Verifique o 'CONTEXTO DO USUÁRIO' abaixo.
@@ -72,7 +79,7 @@ async def run_orchestrator(
     FLUXO DE ANAMNESE:
     1. Identifique qual campo falta preencher na ordem abaixo.
     2. Faça Apenas UMA pergunta por vez referente a esse campo.
-    3. Apresente as opções disponíveis (se houver) de forma amigável.
+    3. Apresente as opções disponíveis (se houver) de forma clara.
     4. Quando o usuário responder, use a ferramenta `update_anamnesis` IMEDIATAMENTE.
     
     MAPA DE CAMPOS E VALORES (Use o valor em MAIÚSCULO na ferramenta):
@@ -193,7 +200,7 @@ async def run_orchestrator(
 
     # Inicializa o modelo (Flash é recomendado para Vision/Multimodal rápido)
     model = genai.GenerativeModel(
-        model_name='gemini-2.5-flash', # Mantendo o nome que você usava, mas verifique se 'gemini-1.5-flash' não é o correto para sua chave.
+        model_name='gemini-2.5-flash', 
         system_instruction=system_prompt,
         tools=tools,
         safety_settings=safety_settings
@@ -233,7 +240,13 @@ async def run_orchestrator(
 
         # O método send_message_async aceita uma lista mista [str, Image]
         response = await convo.send_message_async(msg_content)
+        
+        # Proteção contra resposta vazia
+        if not response.parts:
+            return {"resposta": "Desculpe, não consegui processar sua solicitação no momento (sem resposta da IA).", "meal_saved": False, "diet_created": False}
+            
         response_content = response.parts[0]
+        
     except Exception as e:
         print(f"Erro ao chamar o Gemini: {e}")
         return {"resposta": f"Desculpe, tive um problema ao processar sua solicitação: {e}", "meal_saved": False, "diet_created": False}
@@ -259,9 +272,12 @@ async def run_orchestrator(
             
             elif function_name == "log_meal":
                 
+                # --- MUDANÇA 2: Feedback Clínico ao Registrar Refeição ---
+                description = function_args.get("description")
+                
                 payload = {
                     "type": function_args.get("type"),
-                    "description": function_args.get("description"),
+                    "description": description,
                     "calories": function_args.get("calories"),
                     "protein": function_args.get("protein"),
                     "carbs": function_args.get("carbs"),
@@ -274,8 +290,34 @@ async def run_orchestrator(
                 try:
                     spring_response = requests.post(url, headers=headers, json=payload)
                     spring_response.raise_for_status() 
-                    tool_result_text = f"Refeição '{payload['description']}' registrada com sucesso."
+                    
+                    # Logou com sucesso. Agora vamos gerar o feedback clínico.
+                    tool_result_text = f"Refeição '{description}' registrada no sistema."
+                    
+                    prompt_feedback = f"""
+                    Atue como um nutricionista clínico sério. O usuário acabou de consumir: "{description}".
+                    
+                    Analise este alimento considerando EXCLUSIVAMENTE o contexto de saúde abaixo:
+                    {full_context}
+                    
+                    INSTRUÇÃO:
+                    Forneça um feedback curto (máx 2 frases), profissional e sem emojis.
+                    - Se o alimento for prejudicial para as condições do usuário (ex: açúcar para diabetes, sal para hipertensão, fast food), faça um ALERTA clínico educado.
+                    - Se for uma boa escolha, faça um breve reforço positivo clínico.
+                    - Se for neutro, apenas confirme o registro.
+                    """
+                    
+                    try:
+                        feedback_response = await text_generation_model.generate_content_async(prompt_feedback)
+                        if feedback_response.parts:
+                            clinical_feedback = feedback_response.text.strip()
+                            tool_result_text += f"\n\nAnálise Clínica: {clinical_feedback}"
+                    except Exception as ai_err:
+                        print(f"Erro ao gerar feedback clínico: {ai_err}")
+                        # Se falhar o feedback, não quebra o fluxo, apenas segue sem ele.
+
                     final_result_json['meal_saved'] = True
+                    
                 except requests.exceptions.HTTPError as http_err:
                     print(f"Erro HTTP ao salvar refeição: {http_err.response.text}")
                     tool_result_text = f"Erro ao salvar refeição: {http_err.response.text}"
@@ -306,6 +348,9 @@ async def run_orchestrator(
                 print("--- Gerando cálculo de calorias ---")
                 calc_response = await text_generation_model.generate_content_async(prompt_calculo)
 
+                if not calc_response.parts:
+                     raise Exception("IA de cálculo de dieta não retornou dados.")
+                     
                 cleaned_response = clean_json_string(calc_response.text)
                 calorie_data = json.loads(cleaned_response)
                 
@@ -334,9 +379,9 @@ async def run_orchestrator(
                     spring_response = requests.post(url, headers=headers, json=payload)
                     spring_response.raise_for_status() 
                     
-                    tool_result_text = (f"Dieta '{payload['title']}' criada com sucesso! "
-                            f"Calculei uma meta base de {base_calories} kcal/dia. "
-                            f"Vou reajustar isso dinamicamente. O usuário já pode ver o plano na tela 'Minha Dieta'.")
+                    tool_result_text = (f"Dieta '{payload['title']}' criada com sucesso. "
+                            f"Meta base definida: {base_calories} kcal/dia. "
+                            f"O plano está disponível na seção 'Minha Dieta'.")
                     final_result_json['diet_created'] = True
                             
                 except requests.exceptions.HTTPError as http_err:
@@ -353,7 +398,7 @@ async def run_orchestrator(
                 recipe_constraints = function_args.get("constraints", "Nenhuma")
 
                 prompt_receita = f"""
-                Você é um Nutricionista-Chef.
+                Você é um Nutricionista-Chef Clínico.
                 Sua tarefa é criar UMA receita com base no pedido do usuário e em seu contexto de saúde.
                 CONTEXTO DE SAÚDE DO USUÁRIO (Use para restrições OBRIGATÓRIAS):
                 {full_context} 
@@ -365,12 +410,17 @@ async def run_orchestrator(
                 1.  Crie uma receita que se alinhe ao PEDIDO e ao CONTEXTO de saúde (alergias, etc.).
                 2.  Calcule as estimativas nutricionais (calorias, proteína, carboidratos, gordura).
                 3.  Responda APENAS com um objeto JSON válido. Não inclua "```json" ou explicações.
+                4.  NÃO use emojis.
                 FORMATO JSON OBRIGATÓRIAS:
                 ... (formato JSON) ...
                 """
 
                 print("--- Gerando receita (sub-chamada da IA) ---")
-                recipe_response = await text_generation_model.generate_content_async(prompt_receita)                
+                recipe_response = await text_generation_model.generate_content_async(prompt_receita)
+                
+                if not recipe_response.parts:
+                     raise Exception("IA de receita não retornou dados.")
+
                 cleaned_response = clean_json_string(recipe_response.text)
                 
                 try:
@@ -399,7 +449,7 @@ async def run_orchestrator(
                 passos_str = "\n".join(passos_lista)
 
                 tool_result_text = f"""
-                Receita gerada com sucesso pela sub-IA:
+                Receita gerada:
                 - Título: {recipe_data.get('title', 'N/A')}
                 - Descrição: {recipe_data.get('description', 'N/A')}
                 - Calorias: {recipe_data.get('calories', 0)} kcal
@@ -420,17 +470,74 @@ async def run_orchestrator(
                 
                 payload = {"field": field, "value": str(value)}
                 headers = {"Authorization": f"Bearer {authorization_token}"}
-                # URL para o endpoint PATCH criado no passo 2
                 url = f"{os.getenv('SPRING_API_URL')}/api/anamnesis/{user_id}/partial"
                 
                 try:
-                    # Requests patch
                     spring_response = requests.patch(url, headers=headers, json=payload)
                     spring_response.raise_for_status()
-                    tool_result_text = f"Sucesso! Campo '{field}' atualizado para '{value}'. Prossiga para a próxima pergunta."
-                    # Não precisamos setar diet_created ou meal_saved aqui
+                    tool_result_text = f"Campo '{field}' atualizado para '{value}'. Prossiga."
                 except Exception as e:
                     tool_result_text = f"Erro ao salvar anamnese: {e}"
+
+            elif function_name == "generate_menu_plan":
+                        if not active_diet:
+                            tool_result_text = "Erro: O usuário não possui uma dieta ativa para gerar cardápios."
+                        else:
+                            days_to_gen = int(function_args.get("days", 3))
+                            targets = active_diet.get('dailyTargets', [])
+                            targets.sort(key=lambda x: x['targetDate'])
+                            
+                            import datetime
+                            today = datetime.date.today().isoformat()
+                            upcoming = [t for t in targets if t['targetDate'] >= today][:days_to_gen]
+                            
+                            if not upcoming:
+                                tool_result_text = "Não há metas futuras na dieta ativa para gerar cardápio."
+                            else:
+                                success_count = 0
+                                
+                                for day in upcoming:
+                                    prompt_menu = f"""
+                                    Atue como Nutricionista Esportivo Clínico.
+                                    Gere um cardápio diário completo (Café, Almoço, Jantar, Lanches) para esta data: {day['targetDate']}.
+                                    
+                                    CONTEXTO DO USUÁRIO:
+                                    {full_context}
+                                    
+                                    META DO DIA:
+                                    - Calorias: {day['adjustedCalories']} kcal
+                                    - Proteína: {day.get('adjustedProteinG', 'N/A')}g
+                                    - Carbo: {day.get('adjustedCarbsG', 'N/A')}g
+                                    - Gordura: {day.get('adjustedFatsG', 'N/A')}g
+                                    
+                                    REGRAS:
+                                    - Respeite estritamente as alergias e preferências.
+                                    - Use alimentos acessíveis no Brasil.
+                                    - Seja direto, prático e clínico.
+                                    - NÃO USE EMOJIS.
+                                    - Formate de forma limpa para leitura (use listas markdown).
+                                    - NÃO responda com JSON, responda com o TEXTO FINAL.
+                                    """
+                                    
+                                    print(f"--- Gerando cardápio para {day['targetDate']}... ---")
+                                    menu_response = await text_generation_model.generate_content_async(prompt_menu)
+                                    
+                                    if menu_response.parts:
+                                        menu_text = menu_response.text.strip()
+                                        
+                                        url = f"{os.getenv('SPRING_API_URL')}/api/diets/daily/{day['id']}"
+                                        payload = {"suggestedMenu": menu_text}
+                                        headers = {"Authorization": f"Bearer {authorization_token}"}
+                                        
+                                        try:
+                                            requests.put(url, json=payload, headers=headers)
+                                            success_count += 1
+                                        except Exception as e:
+                                            print(f"Erro ao salvar menu do dia {day['targetDate']}: {e}")
+                                    else:
+                                        print(f"Erro: IA não gerou cardápio para {day['targetDate']}")
+
+                                tool_result_text = f"Sucesso. Gere cardápios detalhados para os próximos {success_count} dias. Disponível na tela de Dieta."
             
             else:
                 tool_result_text = f"Erro: Ferramenta '{function_name}' desconhecida."
@@ -444,14 +551,17 @@ async def run_orchestrator(
             
             response = await convo.send_message_async(content_to_send)
 
-            final_result_json['resposta'] = response.parts[0].text
+            if response.parts:
+                final_result_json['resposta'] = response.text 
+            else:
+                final_result_json['resposta'] = f"A ferramenta {function_name} foi processada. Resultado: {tool_result_text}"
+
             
         except Exception as e:
             print(f"Erro ao executar a ferramenta {function_name}: {e}")
-            final_result_json['resposta'] = f"Desculpe, tive um problema ao usar minha ferramenta {function_name}. Erro: {e}"
+            final_result_json['resposta'] = f"Desculpe, erro ao usar ferramenta {function_name}: {e}"
 
     else:
-        # Foi uma resposta de texto normal
         final_result_json['resposta'] = response_content.text
 
     return final_result_json

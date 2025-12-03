@@ -110,3 +110,17 @@ def update_anamnesis(field: str, value: str) -> dict:
         "field": field,
         "value": value
     }
+
+def generate_menu_plan(days: int = 3) -> dict:
+    """
+    Gera ou regenera sugestões de cardápio detalhadas para os próximos dias da dieta ativa.
+    Use esta ferramenta quando o usuário pedir "sugira um cardápio", "o que devo comer amanhã", 
+    "planeje minhas refeições" ou logo após criar uma nova dieta.
+    
+    Args:
+        days (int): Número de dias para gerar sugestões (padrão 3, máx 7).
+    """
+    print(f"--- 🛠️ Ferramenta GENERATE_MENU_PLAN ativada: {days} dias ---")
+    return {
+        "days": days
+    }
